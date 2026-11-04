@@ -59,7 +59,7 @@ cd AirPlay2Auto
 
 需要 JDK 21、Android SDK 37、NDK 27.0.12077973。
 
-推送到 `main` 后，GitHub Actions 会自动编译，APK 在 Actions 的 Artifacts 中下载。推送 `v*` 标签会自动发布 Release：如果仓库里有已测试的 `release/CarAirPlay-<版本>.apk`，就发布这个文件，否则发布 CI 编译的版本。
+推送到 `main` 后，GitHub Actions 会自动编译，APK 在 Actions 的 Artifacts 中下载。要发布新版本，把测试过的 APK 以 `release/CarAirPlay-<版本>.apk` 提交到 `main`（可附带 `release/notes-<版本>.md` 作为发布说明），Actions 会自动创建 `v<版本>` 标签并发布 Release。
 
 如需 CI 使用固定签名（便于覆盖升级），在仓库 Secrets 中配置 `STORE`（keystore 的 base64）、`STORE_PASSWORD`、`KEY_ALIAS`、`KEY_PASSWORD`。
 
@@ -120,7 +120,7 @@ cd AirPlay2Auto
 
 Requires JDK 21, Android SDK 37 and NDK 27.0.12077973.
 
-Every push to `main` is built by GitHub Actions, and the APK can be downloaded from the run's Artifacts. Pushing a `v*` tag publishes a Release: it uses the tested `release/CarAirPlay-<version>.apk` from the repository when one exists, otherwise the CI build.
+Every push to `main` is built by GitHub Actions, and the APK can be downloaded from the run's Artifacts. To publish a version, commit the tested APK to `main` as `release/CarAirPlay-<version>.apk` (optionally with `release/notes-<version>.md` as release notes); Actions creates the `v<version>` tag and publishes the Release.
 
 To have CI sign with a fixed key (so updates install over the old version), add the repository secrets `STORE` (base64 of the keystore), `STORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`.
 
