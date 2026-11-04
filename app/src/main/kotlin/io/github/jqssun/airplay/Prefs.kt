@@ -135,11 +135,4 @@ object Prefs {
     // re-register AirPlay mDNS whenever the hotspot / network comes up
     val READVERTISE_ON_NETWORK = bool("car_readvertise_on_network", true)
 
-    val HOTSPOT_AUTO_ENABLE = bool("car_hotspot_auto_enable", false)
-    val HOTSPOT_SSID = str("car_hotspot_ssid", "CarAirPlay") { it.isNotBlank() && it.toByteArray().size <= 32 }
-    val HOTSPOT_PASS = str("car_hotspot_pass", "12345678") { it.length in 8..63 }
-    val HOTSPOT_5G = bool("car_hotspot_5g", false)
-    val HOTSPOT_USE_ROOT = bool("car_hotspot_use_root", false)
-    // apply SSID/password to the system before turning the hotspot on
-    val HOTSPOT_APPLY_CONFIG = bool("car_hotspot_apply_config", true)
 }

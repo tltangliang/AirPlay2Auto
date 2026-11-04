@@ -1,9 +1,5 @@
 package io.github.jqssun.airplay.ui
 
-import android.Manifest
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
@@ -20,8 +16,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -30,25 +24,16 @@ import io.github.jqssun.airplay.Prefs
 import io.github.jqssun.airplay.appSettingsIntent
 import io.github.jqssun.airplay.car.CarKeepAlive
 import io.github.jqssun.airplay.car.HotspotController
-import io.github.jqssun.airplay.car.RootShell
 import io.github.jqssun.airplay.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CarScreen(viewModel: MainViewModel) {
     val ctx = LocalContext.current
-    val scope = rememberCoroutineScope()
 
-    val ssidPref by viewModel.pref(Prefs.HOTSPOT_SSID).collectAsState()
-    val passPref by viewModel.pref(Prefs.HOTSPOT_PASS).collectAsState()
-    val band5g by viewModel.pref(Prefs.HOTSPOT_5G).collectAsState()
-    val hotspotAuto by viewModel.pref(Prefs.HOTSPOT_AUTO_ENABLE).collectAsState()
-    val applyConfig by viewModel.pref(Prefs.HOTSPOT_APPLY_CONFIG).collectAsState()
-    val useRoot by viewModel.pref(Prefs.HOTSPOT_USE_ROOT).collectAsState()
     val bootStart by viewModel.pref(Prefs.BOOT_AUTO_START).collectAsState()
     val bootDelay by viewModel.pref(Prefs.BOOT_DELAY_S).collectAsState()
     val bootUi by viewModel.pref(Prefs.BOOT_LAUNCH_UI).collectAsState()
@@ -65,19 +50,12 @@ fun CarScreen(viewModel: MainViewModel) {
     val mirrorAutoFs by viewModel.pref(Prefs.AUTO_FULLSCREEN).collectAsState()
     val mirrorScale by viewModel.pref(Prefs.MIRROR_SCALE).collectAsState()
 
-    var ssid by remember(ssidPref) { mutableStateOf(ssidPref) }
-    var pass by remember(passPref) { mutableStateOf(passPref) }
-    var showPass by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf<String?>(null) }
-    var busy by remember { mutableStateOf(false) }
 
     // live status, refreshed periodically and on resume
     var apState by remember { mutableStateOf(HotspotController.ApState.UNKNOWN) }
     var addresses by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
-    var canWrite by remember { mutableStateOf(HotspotController.canWriteSettings(ctx)) }
     var canOverlay by remember { mutableStateOf(CarKeepAlive.canDrawOverlays(ctx)) }
     var batteryOk by remember { mutableStateOf(CarKeepAlive.ignoringBatteryOptimizations(ctx)) }
-    var rootOk by remember { mutableStateOf<Boolean?>(null) }
     var tick by remember { mutableIntStateOf(0) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -90,29 +68,10 @@ fun CarScreen(viewModel: MainViewModel) {
         while (true) {
             val (s, a) = withContext(Dispatchers.IO) { HotspotController.apState(ctx) to HotspotController.allAddresses() }
             apState = s; addresses = a
-            canWrite = HotspotController.canWriteSettings(ctx)
             canOverlay = CarKeepAlive.canDrawOverlays(ctx)
             batteryOk = CarKeepAlive.ignoringBatteryOptimizations(ctx)
             delay(3000)
         }
-    }
-
-    fun cfg() = HotspotController.Config(ssid.trim(), pass, band5g)
-    fun validate(): String? = when {
-        ssid.isBlank() -> "热点名称不能为空"
-        ssid.toByteArray().size > 32 -> "热点名称过长（最多 32 字节）"
-        pass.length !in 8..63 -> "密码需 8~63 位"
-        else -> null
-    }
-    fun save(): Boolean {
-        validate()?.let { message = it; return false }
-        viewModel.set(Prefs.HOTSPOT_SSID, ssid.trim())
-        viewModel.set(Prefs.HOTSPOT_PASS, pass)
-        return true
-    }
-
-    val locationPerms = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-        HotspotController.startLocalOnly(ctx) { message = it.message; tick++ }
     }
 
     Column(
@@ -129,7 +88,7 @@ fun CarScreen(viewModel: MainViewModel) {
                         HotspotController.ApState.OFF -> "已关闭"
                         HotspotController.ApState.TRANSITION -> "切换中…"
                         HotspotController.ApState.UNKNOWN -> "未知"
-                    } + if (HotspotController.localOnlyActive) "（临时热点运行中）" else "",
+                    },
                         style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
                 Spacer(Modifier.height(6.dp))
@@ -145,134 +104,24 @@ fun CarScreen(viewModel: MainViewModel) {
             }
         }
 
-        // ---------- hotspot ----------
-        CarHeader("热点设置")
-        if (!canWrite) {
-            PermissionRow("需要“修改系统设置”权限", "用于自动开关车机热点（Android 6.0+）", "去授权") {
-                HotspotController.openWriteSettingsPermission(ctx)
-            }
-        }
-        OutlinedTextField(
-            value = ssid, onValueChange = { ssid = it }, singleLine = true,
-            label = { Text("热点名称 (SSID)") },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+        // ---------- hotspot (system settings only) ----------
+        CarHeader("车机热点")
+        Text(
+            "热点名称、密码和开关请在车机系统设置中完成。热点开启后，本应用会自动在热点上重新广播 AirPlay。",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
         )
-        OutlinedTextField(
-            value = pass, onValueChange = { pass = it }, singleLine = true,
-            label = { Text("热点密码（8~63 位）") },
-            visualTransformation = if (showPass) VisualTransformation.None else PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            trailingIcon = {
-                IconButton(onClick = { showPass = !showPass }) {
-                    Icon(if (showPass) Icons.Default.VisibilityOff else Icons.Default.Visibility, null)
-                }
-            },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
-        )
-        CarSwitch("使用 5GHz 频段", "画面更流畅；部分车机或旧手机不支持 5GHz 时请关闭", band5g) {
-            viewModel.set(Prefs.HOTSPOT_5G, it)
-        }
-
         FlowRow(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Button(enabled = !busy, onClick = {
-                if (!save()) return@Button
-                busy = true
-                scope.launch {
-                    val c = cfg()
-                    val msgs = mutableListOf<String>()
-                    withContext(Dispatchers.IO) {
-                        if (applyConfig) msgs += HotspotController.applyConfig(ctx, c, useRoot).message
-                        if (HotspotController.apState(ctx) == HotspotController.ApState.ON) {
-                            // restart so a new SSID/password takes effect
-                            HotspotController.stop(ctx, useRoot)
-                            delay(2000)
-                        }
-                    }
-                    withContext(Dispatchers.IO) {
-                        HotspotController.start(ctx, c, useRoot) { r ->
-                            msgs += r.message
-                            message = msgs.joinToString("\n")
-                            busy = false
-                            tick++
-                        }
-                    }
-                    if (busy) { delay(8000); if (busy) { busy = false; message = (msgs + "已发送开启请求，请查看状态").joinToString("\n") } }
-                }
-            }) {
-                Icon(Icons.Default.WifiTethering, null); Spacer(Modifier.width(6.dp)); Text("保存并开启热点")
+            Button(onClick = { HotspotController.openSystemSettings(ctx) }) {
+                Icon(Icons.Default.WifiTethering, null); Spacer(Modifier.width(6.dp)); Text("打开系统热点设置")
             }
-            OutlinedButton(enabled = !busy, onClick = {
-                busy = true
-                scope.launch {
-                    message = withContext(Dispatchers.IO) { HotspotController.stop(ctx, useRoot).message }
-                    busy = false; tick++
-                }
-            }) { Text("关闭热点") }
-            OutlinedButton(onClick = {
-                if (save()) scope.launch {
-                    message = withContext(Dispatchers.IO) { HotspotController.applyConfig(ctx, cfg(), useRoot).message }
-                }
-            }) { Text("仅保存配置") }
-            OutlinedButton(onClick = {
-                scope.launch {
-                    val c = withContext(Dispatchers.IO) { HotspotController.readSystemConfig(ctx) }
-                    if (c == null) message = "无法读取系统热点配置（此系统不允许）"
-                    else {
-                        ssid = c.ssid; if (c.pass.isNotEmpty()) pass = c.pass
-                        message = "已读取系统热点配置：${c.ssid}"
-                    }
-                }
-            }) { Text("读取系统配置") }
-            OutlinedButton(onClick = { HotspotController.openSystemSettings(ctx) }) {
-                Icon(Icons.Default.Settings, null); Spacer(Modifier.width(6.dp)); Text("系统热点设置")
+            OutlinedButton(onClick = { HotspotController.openWifiSettings(ctx) }) {
+                Icon(Icons.Default.Wifi, null); Spacer(Modifier.width(6.dp)); Text("Wi-Fi 设置")
             }
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            FlowRow(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (!HotspotController.localOnlyActive) {
-                    OutlinedButton(onClick = {
-                        val perms = if (Build.VERSION.SDK_INT >= 33)
-                            arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES, Manifest.permission.ACCESS_FINE_LOCATION)
-                        else arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-                        locationPerms.launch(perms)
-                    }) { Text("开启临时热点（随机名称和密码）") }
-                } else {
-                    OutlinedButton(onClick = { HotspotController.stopLocalOnly(); message = "临时热点已关闭"; tick++ }) {
-                        Text("关闭临时热点")
-                    }
-                }
-            }
-        }
-
-        message?.let {
-            Surface(
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                shape = MaterialTheme.shapes.medium,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
-            ) { Text(it, Modifier.padding(12.dp), style = MaterialTheme.typography.bodyMedium) }
-        }
-
-        CarSwitch("启动时自动开启热点", "开机 / ACC 上电自动启动接收器时，同时开启车机热点", hotspotAuto) {
-            viewModel.set(Prefs.HOTSPOT_AUTO_ENABLE, it)
-        }
-        CarSwitch("开启前写入名称和密码", "把上面的名称/密码写入系统热点（需系统权限或 Root，否则使用系统里已保存的热点）", applyConfig) {
-            viewModel.set(Prefs.HOTSPOT_APPLY_CONFIG, it)
-        }
-        CarSwitch(
-            "使用 Root（已 Root 的车机）",
-            when (rootOk) { true -> "已检测到 Root"; false -> "未检测到 Root 权限"; null -> "Android 11+ 可通过 Root 设置并开启热点" },
-            useRoot
-        ) { on ->
-            viewModel.set(Prefs.HOTSPOT_USE_ROOT, on)
-            if (on) scope.launch { rootOk = withContext(Dispatchers.IO) { RootShell.available() } }
         }
 
         // ---------- display ----------

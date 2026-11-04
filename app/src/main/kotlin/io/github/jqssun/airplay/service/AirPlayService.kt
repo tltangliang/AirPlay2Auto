@@ -377,7 +377,6 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     private fun _carStart(fromBoot: Boolean, startId: Int) {
-        if (fromBoot && prefs[Prefs.HOTSPOT_AUTO_ENABLE]) _carEnableHotspot()
         _startServer(ensureServiceStarted = false)
         if (_serverState.value != ServerState.RUNNING) {
             // network may not be ready yet on head units; retry a few times before giving up
@@ -390,21 +389,6 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     private var _carStartRetries = 0
 
-    private fun _carEnableHotspot() {
-        lifecycleScope.launch(Dispatchers.IO) {
-            if (HotspotController.apState(this@AirPlayService) == HotspotController.ApState.ON) return@launch
-            val cfg = HotspotController.Config(prefs[Prefs.HOTSPOT_SSID], prefs[Prefs.HOTSPOT_PASS], prefs[Prefs.HOTSPOT_5G])
-            val root = prefs[Prefs.HOTSPOT_USE_ROOT]
-            if (prefs[Prefs.HOTSPOT_APPLY_CONFIG]) {
-                val r = HotspotController.applyConfig(this@AirPlayService, cfg, root)
-                log("Hotspot config: ${r.message.lineSequence().first()}")
-            }
-            withContext(Dispatchers.Main) {
-                HotspotController.start(this@AirPlayService, cfg, root) { log("Hotspot: ${it.message.lineSequence().first()}") }
-            }
-        }
-    }
-
     /** Wake / ACC broadcasts from sleep-capable head units: make sure the receiver is up again. */
     private val _carWakeReceiver = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
@@ -415,7 +399,6 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
                 !CarKeepAlive.userStopped(this@AirPlayService)) {
                 lifecycleScope.launch {
                     delay(prefs[Prefs.BOOT_DELAY_S].coerceAtMost(15) * 1000L)
-                    if (prefs[Prefs.HOTSPOT_AUTO_ENABLE]) _carEnableHotspot()
                     _startServer(ensureServiceStarted = true)
                 }
             }

@@ -4,7 +4,7 @@
 
 把安卓车机变成 AirPlay 2 接收端。 · Turn an Android car head unit into an AirPlay 2 receiver.
 
-基于 / Based on [android-airplay-server](https://github.com/jqssun/android-airplay-server)（UxPlay，GPLv3）；热点控制思路参考 / hotspot approach informed by [DiPlay](https://github.com/shihabal3amri/DiPlay)（GPLv3）。
+基于 / Based on [android-airplay-server](https://github.com/jqssun/android-airplay-server)（UxPlay，GPLv3）；车机适配思路参考 / car head-unit ideas from [DiPlay](https://github.com/shihabal3amri/DiPlay)（GPLv3）。
 
 **下载 / Download：** [Releases](https://github.com/tltangliang/AirPlay2Auto/releases/latest)
 
@@ -23,21 +23,15 @@ iPhone / iPad / Mac 可以通过「屏幕镜像」或 AirPlay，把画面、视�
 - 独立包名 `io.github.carairplay`，可与原版共存
 
 **车机热点（「车机」页）**
-- 设置热点名称、密码、2.4G/5G 频段，一键开启 / 关闭热点
-- 按系统版本自动选择开启方式：
-  - Android 6–7：直接设置并开启热点
-  - Android 8–10：通过系统接口开启已保存的热点
-  - Android 11+：通过 TetheringManager 开启；已 Root 的车机可用 `cmd wifi start-softap` 按自定义名称和密码开启
-  - 以上都不可用时：开启临时热点（系统随机名称和密码），或跳转到系统热点设置
-- 需要授予「修改系统设置」权限
-- Android 8.0 以上修改热点**名称和密码**，需要系统权限（应用装为系统应用）或 Root；否则使用系统里已保存的热点
+- 为保证兼容性，热点的名称、密码和开关都在车机**系统设置**中完成，本应用不修改热点
+- 「车机」页显示热点状态和当前网络地址，并提供「打开系统热点设置」「Wi-Fi 设置」快捷入口
+- 热点开启或 Wi-Fi 切换后，自动在新网络上重新广播 AirPlay，手机即可搜到
 
 **自动启动和保活**
 - 开机、快速启动、常见车机 ACC 上电广播都会自动启动，可设置启动延迟，等待 Wi-Fi 就绪
 - 适配「假关机 / 休眠」车机：亮屏、解锁或收到 ACC 广播时自动恢复
 - 可填写自定义 ACC 广播
 - 开机后自动打开界面并退回后台（需要「显示在其他应用上层」权限）
-- 启动时自动开启热点
 - 前台服务加定时检查，被系统清理后自动拉起
 - 热点或 Wi-Fi 变化后自动重新广播 AirPlay，避免手机搜不到
 - 一键申请忽略电池优化
@@ -51,7 +45,7 @@ iPhone / iPad / Mac 可以通过「屏幕镜像」或 AirPlay，把画面、视�
 ### 使用
 
 1. 安装 APK 并打开应用，进入「车机」页
-2. 授予「修改系统设置」权限，设置热点名称和密码，点「保存并开启热点」（也可以在系统里手动开热点）
+2. 点「打开系统热点设置」，在系统中设置并开启车机热点
 3. iPhone 连接车机热点，或与车机连接同一个 Wi-Fi
 4. 在 iPhone 控制中心点「屏幕镜像」，选择「车载AirPlay」（设备名称可在「设置」里修改）
 
@@ -72,7 +66,6 @@ cd AirPlay2Auto
 ### 说明
 
 - 不支持 DRM 内容，例如 Apple TV App 里的影片
-- 热点控制依赖车机固件，不同车机效果可能不同
 - 许可证：GPLv3
 
 ---
@@ -90,21 +83,15 @@ Cast screen mirroring, video and music from an iPhone, iPad or Mac to the head u
 - Separate package name `io.github.carairplay`, so it can be installed next to the original app
 
 **Car hotspot ("Car" tab)**
-- Set the hotspot SSID, password and 2.4/5 GHz band, and turn the hotspot on or off with one tap
-- The method is chosen by Android version:
-  - Android 6–7: configures and starts the hotspot directly
-  - Android 8–10: starts the saved hotspot through the system tethering interface
-  - Android 11+: starts it through TetheringManager; on rooted units, `cmd wifi start-softap` starts it with your own SSID and password
-  - If none of these works: a local-only hotspot (random SSID and password from the system), or a shortcut to the system hotspot settings
-- Requires the "Modify system settings" permission
-- On Android 8.0 and later, changing the hotspot **SSID and password** needs system rights (installed as a system app) or root; otherwise the hotspot saved in the system is used
+- For compatibility, the hotspot name, password and on/off switch are handled in the head unit's **system settings**; the app does not change the hotspot
+- The "Car" tab shows the hotspot state and current network addresses, with shortcuts to the system hotspot and Wi-Fi settings
+- When the hotspot comes up or Wi-Fi changes, AirPlay is re-advertised on the new network so the phone can find it
 
 **Autostart and keep-alive**
 - Starts on boot, quick boot and common head-unit ACC-on broadcasts, with a configurable delay so Wi-Fi is ready first
 - For units that sleep instead of shutting down: recovers on screen on, unlock or ACC broadcasts
 - Custom ACC broadcast actions can be added
 - Can open the app at boot and then send it to the background (needs "Display over other apps")
-- Can turn the hotspot on when it starts
 - Foreground service plus a periodic check that restarts the receiver if the system kills it
 - Re-advertises AirPlay when the hotspot or Wi-Fi changes, so the phone can still find it
 - One-tap request to ignore battery optimization
@@ -118,7 +105,7 @@ Cast screen mirroring, video and music from an iPhone, iPad or Mac to the head u
 ### Usage
 
 1. Install the APK, open the app and go to the "Car" tab
-2. Grant "Modify system settings", set the hotspot name and password, and tap "Save and start hotspot" (or turn the hotspot on in system settings)
+2. Tap "Open system hotspot settings" and set up and turn on the hotspot in the system
 3. Connect the iPhone to the head unit's hotspot, or put both on the same Wi-Fi
 4. On the iPhone, open Control Center, tap Screen Mirroring and choose "车载AirPlay" (the device name can be changed in Settings)
 
@@ -139,5 +126,4 @@ To have CI sign with a fixed key (so updates install over the old version), add 
 ### Notes
 
 - DRM content (for example films in the Apple TV app) is not supported
-- Hotspot control depends on the head unit's firmware and may behave differently between units
 - License: GPLv3
