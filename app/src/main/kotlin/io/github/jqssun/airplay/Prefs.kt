@@ -116,6 +116,10 @@ object Prefs {
     val USB_ONLY = bool("usb_only", false, restart = true)
 
     // ---------- car head-unit options ----------
+    // full-screen now-playing view as soon as music starts
+    val MUSIC_AUTO_FULLSCREEN = bool("car_music_auto_fullscreen", false)
+    // how the mirrored picture fills a full-screen car display
+    val MIRROR_SCALE = str("car_mirror_scale", "BEST_FIT") { it in setOf("BEST_FIT", "STRETCH", "CROP") }
     // delay before starting after boot / ACC on, head units often bring Wi-Fi up late
     val BOOT_DELAY_S = int("car_boot_delay_s", 8, 0..300)
     // open the main screen after boot (needs "display over other apps" on Android 10+)

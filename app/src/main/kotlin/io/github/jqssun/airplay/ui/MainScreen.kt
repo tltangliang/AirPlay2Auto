@@ -24,6 +24,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -35,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
+import io.github.jqssun.airplay.ui.gestures.VideoContentScale as MirrorScale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import android.content.Context
@@ -106,6 +108,12 @@ fun MainScreen(
     val videoSessionPending by viewModel.videoSessionPending.collectAsState()
     val mirroringActive by viewModel.mirroringActive.collectAsState()
     val autoFullscreen by viewModel.pref(Prefs.AUTO_FULLSCREEN).collectAsState()
+    val musicAutoFullscreen by viewModel.pref(Prefs.MUSIC_AUTO_FULLSCREEN).collectAsState()
+    var musicFullscreen by remember { mutableStateOf(false) }
+    val musicActive = audioOnly && connections > 0
+    LaunchedEffect(musicActive) {
+        musicFullscreen = musicActive && musicAutoFullscreen
+    }
 
     // don't use movableContentOf: moving AndroidView across subcomposition boundaries makes it crash on reparent
     val video: @Composable () -> Unit = {
@@ -115,6 +123,19 @@ fun MainScreen(
             onSurfaceDestroyed = onSurfaceDestroyed,
             aspectRatio = aspect
         )
+    }
+
+    // full-screen mirroring: caller-chosen fit / stretch / crop for wide car displays
+    val scaledVideo: @Composable (MirrorScale) -> Unit = { scale ->
+        val aspect by viewModel.videoAspect.collectAsState()
+        VideoContentFrame(aspect = aspect, videoSizePx = null, contentScale = scale, zoom = 1f) { sizeModifier ->
+            VideoSurfaceView(
+                onSurfaceAvailable = onSurfaceAvailable,
+                onSurfaceDestroyed = onSurfaceDestroyed,
+                applyAspectRatio = false,
+                modifier = sizeModifier
+            )
+        }
     }
 
     // fullscreen only once mirroring reports a size: connections rise before the kind is known
@@ -139,14 +160,20 @@ fun MainScreen(
 
     val activity = LocalContext.current as? Activity
     val videoScreen = videoPlaybackActive || videoSessionPending
-    LaunchedEffect(fullscreen, videoScreen) {
+    val musicScreen = musicFullscreen && musicActive
+    LaunchedEffect(fullscreen, videoScreen, musicScreen) {
         val window = activity?.window ?: return@LaunchedEffect
         val controller = WindowInsetsControllerCompat(window, window.decorView)
-        if (fullscreen || videoScreen) {
+        // old head-unit ROMs often ignore the insets controller; the legacy flag hides the status bar there
+        @Suppress("DEPRECATION")
+        val legacy = android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN
+        if (fullscreen || videoScreen || musicScreen) {
             controller.hide(WindowInsetsCompat.Type.systemBars())
             controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            if (android.os.Build.VERSION.SDK_INT < 30) window.addFlags(legacy)
         } else {
             controller.show(WindowInsetsCompat.Type.systemBars())
+            if (android.os.Build.VERSION.SDK_INT < 30) window.clearFlags(legacy)
         }
     }
 
@@ -508,11 +535,14 @@ fun MainScreen(
         if (pin != null) fullscreen = false
     }
 
-    if (fullscreen) {
+    if (musicScreen) {
+        BackHandler { musicFullscreen = false }
+        FullscreenMusic(viewModel = viewModel, onExit = { musicFullscreen = false })
+    } else if (fullscreen) {
         BackHandler { fullscreen = false }
         FullscreenVideo(
             viewModel = viewModel,
-            video = video,
+            video = scaledVideo,
             onExitFullscreen = { fullscreen = false },
             onPip = onPip
         )
@@ -538,7 +568,7 @@ fun MainScreen(
                     TabContent(
                         tab, viewModel, video,
                         onFullscreen = { fullscreen = true }, onPip = onPip, onLocalNetwork = onLocalNetwork,
-                        showAudioMode = audioOnly
+                        showAudioMode = audioOnly, onMusicFullscreen = { musicFullscreen = true }
                     )
                 }
                 AudioMiniController(
@@ -575,7 +605,7 @@ fun MainScreen(
                 TabContent(
                     tab, viewModel, video,
                     onFullscreen = { fullscreen = true }, onPip = onPip, onLocalNetwork = onLocalNetwork,
-                    showAudioMode = audioOnly
+                    showAudioMode = audioOnly, onMusicFullscreen = { musicFullscreen = true }
                 )
             }
         }
@@ -611,12 +641,14 @@ private fun TabContent(
     onFullscreen: () -> Unit,
     onPip: () -> Unit,
     onLocalNetwork: () -> Unit,
-    showAudioMode: Boolean
+    showAudioMode: Boolean,
+    onMusicFullscreen: () -> Unit = {}
 ) {
     when (tab) {
         Tab.OVERVIEW -> OverviewContent(
             viewModel, video,
-            onFullscreen = onFullscreen, onPip = onPip, onLocalNetwork = onLocalNetwork, showAudioMode = showAudioMode
+            onFullscreen = onFullscreen, onPip = onPip, onLocalNetwork = onLocalNetwork, showAudioMode = showAudioMode,
+            onMusicFullscreen = onMusicFullscreen
         )
         Tab.CAR -> CarScreen(viewModel)
         Tab.LOGS -> LogsScreen(viewModel)
@@ -631,7 +663,8 @@ private fun OverviewContent(
     onFullscreen: () -> Unit,
     onPip: () -> Unit,
     onLocalNetwork: () -> Unit,
-    showAudioMode: Boolean = false
+    showAudioMode: Boolean = false,
+    onMusicFullscreen: () -> Unit = {}
 ) {
     val state by viewModel.serverState.collectAsState()
     val localNetwork by viewModel.localNetwork.collectAsState()
@@ -665,6 +698,7 @@ private fun OverviewContent(
                 !mirroringActive && !videoPlaybackActive
             if (showAudioMode && state == ServerState.RUNNING && connections > 0) {
                 NowPlayingContent(viewModel)
+                FullscreenButton(onMusicFullscreen, Modifier.align(Alignment.TopEnd))
             } else {
                 if (state == ServerState.RUNNING && (mirroringActive || idlePreview)) {
                     video()
@@ -698,6 +732,8 @@ private fun OverviewContent(
                     )
                 }
                 if (state == ServerState.RUNNING && mirroringActive) {
+                    // tap anywhere on the mirrored picture to go full screen (handy while driving)
+                    Box(Modifier.matchParentSize().clickable(onClick = onFullscreen))
                     Row(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)) {
                         IconButton(onClick = onPip, modifier = Modifier.dpadFocus()) {
                             Icon(
@@ -705,12 +741,7 @@ private fun OverviewContent(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                             )
                         }
-                        IconButton(onClick = onFullscreen, modifier = Modifier.dpadFocus()) {
-                            Icon(
-                                Icons.Default.Fullscreen, contentDescription = stringResource(R.string.cd_fullscreen),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                            )
-                        }
+                        FullscreenButton(onFullscreen)
                     }
                 }
             }
@@ -808,10 +839,14 @@ private fun OverviewContent(
 @Composable
 private fun FullscreenVideo(
     viewModel: MainViewModel,
-    video: @Composable () -> Unit,
+    video: @Composable (MirrorScale) -> Unit,
     onExitFullscreen: () -> Unit,
     onPip: () -> Unit
 ) {
+    val scalePref by viewModel.pref(Prefs.MIRROR_SCALE).collectAsState()
+    val scale = runCatching { MirrorScale.valueOf(scalePref) }.getOrDefault(MirrorScale.BEST_FIT)
+    var scaleHint by remember { mutableStateOf(false) }
+    LaunchedEffect(scaleHint, scalePref) { if (scaleHint) { delay(1500); scaleHint = false } }
     val videoResolution by viewModel.videoResolution.collectAsState()
     val debugEnabled by viewModel.pref(Prefs.DEBUG_ENABLED).collectAsState()
     val debugInfo by viewModel.debugInfo.collectAsState()
@@ -831,12 +866,27 @@ private fun FullscreenVideo(
             .pointerInput(Unit) { detectTapGestures { tapTick++ } },
         contentAlignment = Alignment.Center
     ) {
-        video()
+        video(scale)
+        if (scaleHint) {
+            GestureInfoText(info = stringResource(scale.nameRes()), modifier = Modifier.align(Alignment.Center))
+        }
         androidx.compose.animation.AnimatedVisibility(
             visible = controlsVisible,
             modifier = Modifier.align(Alignment.TopEnd)
         ) {
             Row(modifier = Modifier.padding(8.dp)) {
+                IconButton(onClick = {
+                    val next = when (scale) {
+                        MirrorScale.BEST_FIT -> MirrorScale.STRETCH
+                        MirrorScale.STRETCH -> MirrorScale.CROP
+                        else -> MirrorScale.BEST_FIT
+                    }
+                    viewModel.set(Prefs.MIRROR_SCALE, next.name)
+                    scaleHint = true
+                    tapTick++
+                }, modifier = Modifier.dpadFocus()) {
+                    Icon(scale.icon(), contentDescription = stringResource(scale.nameRes()), tint = Color.White.copy(alpha = 0.8f))
+                }
                 IconButton(onClick = onPip, modifier = Modifier.dpadFocus()) {
                     Icon(
                         painterResource(R.drawable.ic_pip), contentDescription = stringResource(R.string.cd_pip),
@@ -929,32 +979,7 @@ private fun NowPlayingContent(viewModel: MainViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // cover art
-        Box(
-            modifier = Modifier
-                .weight(1f, fill = false)
-                .aspectRatio(1f)
-                .fillMaxWidth(0.7f)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-            contentAlignment = Alignment.Center
-        ) {
-            if (track.coverArt != null) {
-                Image(
-                    bitmap = track.coverArt!!.asImageBitmap(),
-                    contentDescription = stringResource(R.string.cd_cover_art),
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Icon(
-                    Icons.Default.MusicNote,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                )
-            }
-        }
+        CoverArt(track, Modifier.weight(1f, fill = false).aspectRatio(1f).fillMaxWidth(0.7f))
 
         Spacer(Modifier.height(20.dp))
 
@@ -986,7 +1011,107 @@ private fun NowPlayingContent(viewModel: MainViewModel) {
         }
 
         Spacer(Modifier.height(16.dp))
+        MusicControls(viewModel)
+    }
+}
 
+@Composable
+private fun FullscreenButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    FilledTonalIconButton(onClick = onClick, modifier = modifier.padding(4.dp).size(48.dp).dpadFocus(CircleShape)) {
+        Icon(Icons.Default.Fullscreen, contentDescription = stringResource(R.string.cd_fullscreen), modifier = Modifier.size(28.dp))
+    }
+}
+
+@Composable
+private fun CoverArt(track: io.github.jqssun.airplay.audio.TrackInfo, modifier: Modifier, iconSize: androidx.compose.ui.unit.Dp = 64.dp) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        contentAlignment = Alignment.Center
+    ) {
+        if (track.coverArt != null) {
+            Image(
+                bitmap = track.coverArt.asImageBitmap(),
+                contentDescription = stringResource(R.string.cd_cover_art),
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Icon(
+                Icons.Default.MusicNote, contentDescription = null, modifier = Modifier.size(iconSize),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+            )
+        }
+    }
+}
+
+/** Full-screen now playing: big cover art and controls sized for a car display. */
+@Composable
+@AndroidxOptIn(UnstableApi::class)
+private fun FullscreenMusic(viewModel: MainViewModel, onExit: () -> Unit) {
+    val track by viewModel.trackInfo.collectAsState()
+    MaterialTheme(colorScheme = darkColorScheme()) {
+        BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
+            track.coverArt?.let {
+                Image(
+                    bitmap = it.asImageBitmap(), contentDescription = null,
+                    modifier = Modifier.fillMaxSize().blur(48.dp), contentScale = ContentScale.Crop, alpha = 0.35f
+                )
+            }
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.2f), Color.Black.copy(alpha = 0.7f)))))
+            val info: @Composable ColumnScope.(Alignment.Horizontal) -> Unit = { align ->
+                Text(
+                    track.title.ifEmpty { stringResource(R.string.unknown_track) },
+                    style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(align)
+                )
+                if (track.artist.isNotEmpty()) Text(
+                    track.artist, style = MaterialTheme.typography.titleLarge, color = Color.White.copy(alpha = 0.85f),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(align)
+                )
+                if (track.album.isNotEmpty()) Text(
+                    track.album, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.6f),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(align)
+                )
+            }
+            if (maxWidth > maxHeight) {
+                Row(
+                    Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 40.dp, vertical = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CoverArt(track, Modifier.fillMaxHeight(0.85f).aspectRatio(1f), iconSize = 96.dp)
+                    Spacer(Modifier.width(40.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                        info(Alignment.Start)
+                        Spacer(Modifier.height(24.dp))
+                        MusicControls(viewModel)
+                    }
+                }
+            } else {
+                Column(
+                    Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center
+                ) {
+                    CoverArt(track, Modifier.fillMaxWidth(0.85f).aspectRatio(1f), iconSize = 96.dp)
+                    Spacer(Modifier.height(28.dp))
+                    info(Alignment.CenterHorizontally)
+                    Spacer(Modifier.height(20.dp))
+                    MusicControls(viewModel)
+                }
+            }
+            IconButton(onClick = onExit, modifier = Modifier.align(Alignment.TopEnd).safeDrawingPadding().padding(8.dp).dpadFocus()) {
+                Icon(Icons.Default.FullscreenExit, contentDescription = stringResource(R.string.cd_exit_fullscreen),
+                    tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(32.dp))
+            }
+        }
+    }
+}
+
+@Composable
+@AndroidxOptIn(UnstableApi::class)
+private fun MusicControls(viewModel: MainViewModel) {
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         val player = viewModel.dacpPlayer
         if (player != null) {
             // BottomControls' default row, minus its video-overlay gradient

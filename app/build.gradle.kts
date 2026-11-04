@@ -13,6 +13,10 @@ val localProps = Properties().apply {
 
 val allAbis = listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 
+base {
+    archivesName.set("AirPlay2Auto")
+}
+
 android {
     namespace = "io.github.jqssun.airplay"
     compileSdk = 37
@@ -33,8 +37,8 @@ android {
         applicationId = "io.github.carairplay"
         minSdk = 23
         targetSdk = 37
-        versionCode = 100
-        versionName = "1.0.0-car"
+        versionCode = 110
+        versionName = "1.1.0"
 
         externalNativeBuild {
             cmake {

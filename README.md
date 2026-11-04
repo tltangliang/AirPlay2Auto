@@ -42,12 +42,18 @@ iPhone / iPad / Mac 可以通过「屏幕镜像」或 AirPlay，把画面、视�
 - 热点或 Wi-Fi 变化后自动重新广播 AirPlay，避免手机搜不到
 - 一键申请忽略电池优化
 
+**全屏显示**
+- 屏幕镜像：点画面或全屏按钮进入全屏，可选「适应 / 拉伸 / 裁剪」，宽屏车机去黑边，选择会被记住
+- 音乐：全屏播放页（大封面、歌曲信息、播放控制、音量），横屏 / 竖屏自适应
+- 视频：AirPlay 视频始终全屏播放，支持适应 / 拉伸 / 裁剪 / 100%
+- 可设置镜像连接时自动全屏、音乐播放时自动全屏
+
 ### 使用
 
 1. 安装 APK 并打开应用，进入「车机」页
 2. 授予「修改系统设置」权限，设置热点名称和密码，点「保存并开启热点」（也可以在系统里手动开热点）
 3. iPhone 连接车机热点，或与车机连接同一个 Wi-Fi
-4. 在 iPhone 控制中心点「屏幕镜像」，选择「车载AirPlay」
+4. 在 iPhone 控制中心点「屏幕镜像」，选择「车载AirPlay」（设备名称可在「设置」里修改）
 
 ### 编译
 
@@ -59,7 +65,7 @@ cd AirPlay2Auto
 
 需要 JDK 21、Android SDK 37、NDK 27.0.12077973。
 
-推送到 `main` 后，GitHub Actions 会自动编译，APK 在 Actions 的 Artifacts 中下载。要发布新版本，把测试过的 APK 以 `release/CarAirPlay-<版本>.apk` 提交到 `main`（可附带 `release/notes-<版本>.md` 作为发布说明），Actions 会自动创建 `v<版本>` 标签并发布 Release。
+推送到 `main` 后，GitHub Actions 会自动编译，APK 在 Actions 的 Artifacts 中下载。要发布新版本，把测试过的 APK 以 `release/AirPlay2Auto-<版本>.apk` 提交到 `main`（可附带 `release/notes-<版本>.md` 作为发布说明），Actions 会自动创建 `v<版本>` 标签并发布 Release。
 
 如需 CI 使用固定签名（便于覆盖升级），在仓库 Secrets 中配置 `STORE`（keystore 的 base64）、`STORE_PASSWORD`、`KEY_ALIAS`、`KEY_PASSWORD`。
 
@@ -103,12 +109,18 @@ Cast screen mirroring, video and music from an iPhone, iPad or Mac to the head u
 - Re-advertises AirPlay when the hotspot or Wi-Fi changes, so the phone can still find it
 - One-tap request to ignore battery optimization
 
+**Full screen**
+- Screen mirroring: tap the picture or the fullscreen button; choose fit / stretch / crop to remove black bars on wide car displays (remembered)
+- Music: full-screen player with large cover art, track info, playback controls and volume, adapting to landscape and portrait
+- Video: AirPlay video always plays full screen, with fit / stretch / crop / 100%
+- Optional automatic full screen when mirroring starts or music plays
+
 ### Usage
 
 1. Install the APK, open the app and go to the "Car" tab
 2. Grant "Modify system settings", set the hotspot name and password, and tap "Save and start hotspot" (or turn the hotspot on in system settings)
 3. Connect the iPhone to the head unit's hotspot, or put both on the same Wi-Fi
-4. On the iPhone, open Control Center, tap Screen Mirroring and choose "车载AirPlay"
+4. On the iPhone, open Control Center, tap Screen Mirroring and choose "车载AirPlay" (the device name can be changed in Settings)
 
 ### Build
 
@@ -120,7 +132,7 @@ cd AirPlay2Auto
 
 Requires JDK 21, Android SDK 37 and NDK 27.0.12077973.
 
-Every push to `main` is built by GitHub Actions, and the APK can be downloaded from the run's Artifacts. To publish a version, commit the tested APK to `main` as `release/CarAirPlay-<version>.apk` (optionally with `release/notes-<version>.md` as release notes); Actions creates the `v<version>` tag and publishes the Release.
+Every push to `main` is built by GitHub Actions, and the APK can be downloaded from the run's Artifacts. To publish a version, commit the tested APK to `main` as `release/AirPlay2Auto-<version>.apk` (optionally with `release/notes-<version>.md` as release notes); Actions creates the `v<version>` tag and publishes the Release.
 
 To have CI sign with a fixed key (so updates install over the old version), add the repository secrets `STORE` (base64 of the keystore), `STORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD`.
 

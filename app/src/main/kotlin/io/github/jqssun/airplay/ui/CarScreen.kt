@@ -61,6 +61,9 @@ fun CarScreen(viewModel: MainViewModel) {
     val launchOnConnect by viewModel.pref(Prefs.LAUNCH_ON_CONNECT).collectAsState()
     val keepScreenOn by viewModel.pref(Prefs.KEEP_SCREEN_ON).collectAsState()
     val serverName by viewModel.pref(Prefs.SERVER_NAME).collectAsState()
+    val musicAutoFs by viewModel.pref(Prefs.MUSIC_AUTO_FULLSCREEN).collectAsState()
+    val mirrorAutoFs by viewModel.pref(Prefs.AUTO_FULLSCREEN).collectAsState()
+    val mirrorScale by viewModel.pref(Prefs.MIRROR_SCALE).collectAsState()
 
     var ssid by remember(ssidPref) { mutableStateOf(ssidPref) }
     var pass by remember(passPref) { mutableStateOf(passPref) }
@@ -270,6 +273,26 @@ fun CarScreen(viewModel: MainViewModel) {
         ) { on ->
             viewModel.set(Prefs.HOTSPOT_USE_ROOT, on)
             if (on) scope.launch { rootOk = withContext(Dispatchers.IO) { RootShell.available() } }
+        }
+
+        // ---------- display ----------
+        CarHeader("投屏显示")
+        CarSwitch("镜像连接时自动全屏", "iPhone 开始屏幕镜像后直接全屏显示；也可点画面或全屏按钮进入", mirrorAutoFs) {
+            viewModel.set(Prefs.AUTO_FULLSCREEN, it)
+        }
+        CarSwitch("音乐播放时自动全屏", "播放音乐时直接显示全屏封面和控制；也可点右上角全屏按钮进入", musicAutoFs) {
+            viewModel.set(Prefs.MUSIC_AUTO_FULLSCREEN, it)
+        }
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Text("全屏镜像画面比例")
+            Text("宽屏车机可选“拉伸”或“裁剪”去掉黑边；全屏时也可点右上角按钮切换",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("BEST_FIT" to "适应", "STRETCH" to "拉伸", "CROP" to "裁剪").forEach { (v, label) ->
+                    FilterChip(selected = mirrorScale == v, onClick = { viewModel.set(Prefs.MIRROR_SCALE, v) }, label = { Text(label) })
+                }
+            }
         }
 
         // ---------- autostart ----------

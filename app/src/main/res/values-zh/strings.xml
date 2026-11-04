@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">车载AirPlay</string>
+    <string name="app_name">AirPlay2Auto</string>
 
     <string name="notification_channel">AirPlay 服务</string>
-    <string name="notification_title">车载 AirPlay 运行中</string>
+    <string name="notification_title">AirPlay2Auto 运行中</string>
     <string name="notification_text">正在等待 iPhone / iPad 投屏</string>
     <string name="notification_pin_title">需要 AirPlay 配对码</string>
     <string name="notification_pin_text">配对码：%1$s</string>
