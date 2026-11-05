@@ -36,6 +36,12 @@ iPhone / iPad / Mac 可以通过「屏幕镜像」或 AirPlay，把画面、视�
 - 热点或 Wi-Fi 变化后自动重新广播 AirPlay，避免手机搜不到
 - 一键申请忽略电池优化
 
+**系统权限和原生设置（「车机」页）**
+- 「系统权限」列表实时显示每项权限是否已开启，一键跳到对应的系统页面：附近设备 / 本地网络（Android 17+）、通知、显示在其他应用上层、忽略电池优化、自启动 / 后台运行、应用详情
+- 运行时权限会先弹出系统授权框，被拒绝后自动跳到系统设置
+- 「安卓原生设置」快捷入口：设置主页、WLAN、热点、蓝牙、显示、声音、应用管理、悬浮窗管理、电池优化名单、语言、日期时间、开发者选项、关于设备
+- 优先打开安卓原生设置（`com.android.settings`），适合桌面隐藏了原生设置的车机；车机没有原生设置时自动改用系统默认的设置页面
+
 **全屏显示**
 - 屏幕镜像：点画面或全屏按钮进入全屏，可选「适应 / 拉伸 / 裁剪」，宽屏车机去黑边，选择会被记住
 - 音乐：全屏播放页（大封面、歌曲信息、播放控制、音量），横屏 / 竖屏自适应
@@ -44,7 +50,7 @@ iPhone / iPad / Mac 可以通过「屏幕镜像」或 AirPlay，把画面、视�
 
 ### 使用
 
-1. 安装 APK 并打开应用，进入「车机」页
+1. 安装 APK 并打开应用，进入「车机」页，在「系统权限」里把各项权限打开
 2. 点「打开系统热点设置」，在系统中设置并开启车机热点
 3. iPhone 连接车机热点，或与车机连接同一个 Wi-Fi
 4. 在 iPhone 控制中心点「屏幕镜像」，选择「车载AirPlay」（设备名称可在「设置」里修改）
@@ -96,6 +102,12 @@ Cast screen mirroring, video and music from an iPhone, iPad or Mac to the head u
 - Re-advertises AirPlay when the hotspot or Wi-Fi changes, so the phone can still find it
 - One-tap request to ignore battery optimization
 
+**System permissions and native settings ("Car" tab)**
+- The "System permissions" list shows each permission's live state and opens the matching system page: nearby devices / local network (Android 17+), notifications, display over other apps, battery optimization, autostart / background running, and app info
+- Runtime permissions show the system prompt first and open system settings if refused
+- "Native Android settings" shortcuts: Settings home, Wi-Fi, hotspot, Bluetooth, display, sound, apps, overlay permissions, battery optimization list, language, date and time, developer options, about device
+- Opens the native Android settings (`com.android.settings`) first, which helps on head units whose launcher hides them; falls back to the system default settings screen when a unit has no native settings
+
 **Full screen**
 - Screen mirroring: tap the picture or the fullscreen button; choose fit / stretch / crop to remove black bars on wide car displays (remembered)
 - Music: full-screen player with large cover art, track info, playback controls and volume, adapting to landscape and portrait
@@ -104,7 +116,7 @@ Cast screen mirroring, video and music from an iPhone, iPad or Mac to the head u
 
 ### Usage
 
-1. Install the APK, open the app and go to the "Car" tab
+1. Install the APK, open the app, go to the "Car" tab and turn on the permissions under "System permissions"
 2. Tap "Open system hotspot settings" and set up and turn on the hotspot in the system
 3. Connect the iPhone to the head unit's hotspot, or put both on the same Wi-Fi
 4. On the iPhone, open Control Center, tap Screen Mirroring and choose "车载AirPlay" (the device name can be changed in Settings)

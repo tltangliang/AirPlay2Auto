@@ -21,8 +21,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.jqssun.airplay.Prefs
-import io.github.jqssun.airplay.appSettingsIntent
 import io.github.jqssun.airplay.car.CarKeepAlive
+import io.github.jqssun.airplay.car.SystemSettings
 import io.github.jqssun.airplay.car.HotspotController
 import io.github.jqssun.airplay.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
@@ -55,7 +55,6 @@ fun CarScreen(viewModel: MainViewModel) {
     var apState by remember { mutableStateOf(HotspotController.ApState.UNKNOWN) }
     var addresses by remember { mutableStateOf(emptyList<Pair<String, String>>()) }
     var canOverlay by remember { mutableStateOf(CarKeepAlive.canDrawOverlays(ctx)) }
-    var batteryOk by remember { mutableStateOf(CarKeepAlive.ignoringBatteryOptimizations(ctx)) }
     var tick by remember { mutableIntStateOf(0) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -69,7 +68,6 @@ fun CarScreen(viewModel: MainViewModel) {
             val (s, a) = withContext(Dispatchers.IO) { HotspotController.apState(ctx) to HotspotController.allAddresses() }
             apState = s; addresses = a
             canOverlay = CarKeepAlive.canDrawOverlays(ctx)
-            batteryOk = CarKeepAlive.ignoringBatteryOptimizations(ctx)
             delay(3000)
         }
     }
@@ -103,6 +101,10 @@ fun CarScreen(viewModel: MainViewModel) {
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+
+        // ---------- permissions ----------
+        CarHeader("系统权限")
+        PermissionSection()
 
         // ---------- hotspot (system settings only) ----------
         CarHeader("车机热点")
@@ -152,7 +154,7 @@ fun CarScreen(viewModel: MainViewModel) {
         DelayField(bootDelay) { viewModel.set(Prefs.BOOT_DELAY_S, it) }
         CarSwitch("开机后打开本应用界面", if (canOverlay) "开机自动打开界面" else "需要“显示在其他应用上层”权限（点击开关去授权）", bootUi && canOverlay) {
             viewModel.set(Prefs.BOOT_LAUNCH_UI, it)
-            if (it && !canOverlay) CarKeepAlive.openOverlaySettings(ctx)
+            if (it && !canOverlay) SystemSettings.overlay(ctx)
         }
         if (bootUi) CarSwitch("打开后自动退到后台", "开机打开界面 2.5 秒后返回桌面，不影响导航", bootBg) {
             viewModel.set(Prefs.BOOT_LAUNCH_BACKGROUND, it)
@@ -162,7 +164,7 @@ fun CarScreen(viewModel: MainViewModel) {
         }
         CarSwitch("手机连接时自动弹出画面", if (canOverlay) "iPhone 投屏时自动切到全屏画面" else "需要“显示在其他应用上层”权限（点击开关去授权）", launchOnConnect && canOverlay) {
             viewModel.set(Prefs.LAUNCH_ON_CONNECT, it)
-            if (it && !canOverlay) CarKeepAlive.openOverlaySettings(ctx)
+            if (it && !canOverlay) SystemSettings.overlay(ctx)
         }
         CarSwitch("休眠唤醒后自动恢复", "适配“假关机/休眠”车机：亮屏、解锁、ACC 广播时检查并恢复接收", accWake) {
             viewModel.set(Prefs.ACC_WAKE_START, it)
@@ -178,14 +180,10 @@ fun CarScreen(viewModel: MainViewModel) {
         CarSwitch("投屏时屏幕常亮", "防止车机投屏时熄屏", keepScreenOn) {
             viewModel.set(Prefs.KEEP_SCREEN_ON, it)
         }
-        if (!batteryOk) {
-            PermissionRow("建议关闭电池优化", "防止车机系统在后台杀掉接收器", "去设置") {
-                CarKeepAlive.requestIgnoreBatteryOptimizations(ctx)
-            }
-        }
-        PermissionRow("自启动 / 后台运行权限", "部分车机系统（如定制 ROM）需在应用详情或“自启动管理”中允许", "应用详情") {
-            ctx.startActivity(ctx.appSettingsIntent().addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-        }
+
+        // ---------- native settings ----------
+        CarHeader("安卓原生设置")
+        NativeSettingsSection()
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -205,16 +203,6 @@ private fun CarSwitch(title: String, description: String, checked: Boolean, onCh
         headlineContent = { Text(title) },
         supportingContent = { Text(description) },
         trailingContent = { Switch(checked = checked, onCheckedChange = null) }
-    )
-}
-
-@Composable
-private fun PermissionRow(title: String, description: String, action: String, onClick: () -> Unit) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = { Text(description) },
-        leadingContent = { Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.tertiary) },
-        trailingContent = { FilledTonalButton(onClick = onClick) { Text(action) } }
     )
 }
 
