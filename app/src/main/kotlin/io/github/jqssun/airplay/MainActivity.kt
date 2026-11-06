@@ -101,10 +101,12 @@ class MainActivity : ComponentActivity() {
             lifecycleScope.launch {
                 repeatOnLifecycle(Lifecycle.State.STARTED) {
                     combine(
-                        viewModel.serverState, viewModel.connectionCount,
-                        viewModel.videoPlaybackActive, viewModel.videoPlaybackAspect,
-                        viewModel.videoAspect
-                    ) { _, _, _, _, _ -> }.collect { setPictureInPictureParams(_pipParams()) }
+                        listOf<kotlinx.coroutines.flow.Flow<Any?>>(
+                            viewModel.serverState, viewModel.connectionCount,
+                            viewModel.videoPlaybackActive, viewModel.videoPlaybackAspect,
+                            viewModel.videoAspect, viewModel.pref(Prefs.PIP_ENABLED)
+                        )
+                    ) { }.collect { setPictureInPictureParams(_pipParams()) }
                 }
             }
         }
@@ -169,7 +171,7 @@ class MainActivity : ComponentActivity() {
     }
 
     fun enterPip() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !viewModel.pref(Prefs.PIP_ENABLED).value) return
         enterPictureInPictureMode(_pipParams())
     }
 
@@ -185,7 +187,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun _shouldAutoPip(): Boolean =
-        viewModel.serverState.value == AirPlayService.ServerState.RUNNING &&
+        viewModel.pref(Prefs.PIP_ENABLED).value &&
+            viewModel.serverState.value == AirPlayService.ServerState.RUNNING &&
             viewModel.connectionCount.value > 0
 
     override fun onUserLeaveHint() {

@@ -47,6 +47,7 @@ iPhone / iPad / Mac 可以通过「屏幕镜像」或 AirPlay，把画面、视�
 - 音乐：全屏播放页（大封面、歌曲信息、播放控制、音量），横屏 / 竖屏自适应
 - 视频：AirPlay 视频始终全屏播放，支持适应 / 拉伸 / 裁剪 / 100%
 - 可设置镜像连接时自动全屏、音乐播放时自动全屏
+- 画中画小窗默认关闭：很多车机系统无法操作画中画，会留下点不动的黑框；车机支持时可在「车机」页开启
 
 ### 使用
 
@@ -113,6 +114,7 @@ Cast screen mirroring, video and music from an iPhone, iPad or Mac to the head u
 - Music: full-screen player with large cover art, track info, playback controls and volume, adapting to landscape and portrait
 - Video: AirPlay video always plays full screen, with fit / stretch / crop / 100%
 - Optional automatic full screen when mirroring starts or music plays
+- Picture-in-picture is off by default: many head-unit systems can't interact with the PiP window and leave an unclickable black box; turn it on in the "Car" tab if your unit supports it
 
 ### Usage
 

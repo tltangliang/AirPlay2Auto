@@ -49,6 +49,7 @@ fun CarScreen(viewModel: MainViewModel) {
     val musicAutoFs by viewModel.pref(Prefs.MUSIC_AUTO_FULLSCREEN).collectAsState()
     val mirrorAutoFs by viewModel.pref(Prefs.AUTO_FULLSCREEN).collectAsState()
     val mirrorScale by viewModel.pref(Prefs.MIRROR_SCALE).collectAsState()
+    val pipEnabled by viewModel.pref(Prefs.PIP_ENABLED).collectAsState()
 
 
     // live status, refreshed periodically and on resume
@@ -134,6 +135,11 @@ fun CarScreen(viewModel: MainViewModel) {
         CarSwitch("音乐播放时自动全屏", "播放音乐时直接显示全屏封面和控制；也可点右上角全屏按钮进入", musicAutoFs) {
             viewModel.set(Prefs.MUSIC_AUTO_FULLSCREEN, it)
         }
+        CarSwitch(
+            "画中画小窗",
+            "离开应用时缩成小窗继续显示。很多车机系统无法操作画中画小窗，会出现点不动、回不到应用的黑框，默认关闭；确认车机支持再开启",
+            pipEnabled
+        ) { viewModel.set(Prefs.PIP_ENABLED, it) }
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text("全屏镜像画面比例")
             Text("宽屏车机可选“拉伸”或“裁剪”去掉黑边；全屏时也可点右上角按钮切换",

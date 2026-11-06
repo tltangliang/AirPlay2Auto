@@ -255,9 +255,10 @@ fun MainScreen(
         val videoTitle by viewModel.videoTitle.collectAsState()
         val videoLocation by viewModel.videoLocation.collectAsState()
         val speed by viewModel.videoSpeed.collectAsState()
+        val pipEnabled by viewModel.pref(Prefs.PIP_ENABLED).collectAsState()
         val isPipSupported = remember {
             context.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
-        }
+        } && pipEnabled
         var showSpeedSelector by remember { mutableStateOf(false) }
         BackHandler { viewModel.stopVideoPlayback() }
 
@@ -677,6 +678,7 @@ private fun OverviewContent(
     val videoPlaybackActive by viewModel.videoPlaybackActive.collectAsState()
     val debugEnabled by viewModel.pref(Prefs.DEBUG_ENABLED).collectAsState()
     val debugInfo by viewModel.debugInfo.collectAsState()
+    val pipEnabled by viewModel.pref(Prefs.PIP_ENABLED).collectAsState()
     val tv = isTv()
     val startFocus = remember { FocusRequester() }
     LaunchedEffect(Unit) {
@@ -735,7 +737,7 @@ private fun OverviewContent(
                     // tap anywhere on the mirrored picture to go full screen (handy while driving)
                     Box(Modifier.matchParentSize().clickable(onClick = onFullscreen))
                     Row(modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)) {
-                        IconButton(onClick = onPip, modifier = Modifier.dpadFocus()) {
+                        if (pipEnabled) IconButton(onClick = onPip, modifier = Modifier.dpadFocus()) {
                             Icon(
                                 painterResource(R.drawable.ic_pip), contentDescription = stringResource(R.string.cd_pip),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
@@ -844,6 +846,7 @@ private fun FullscreenVideo(
     onPip: () -> Unit
 ) {
     val scalePref by viewModel.pref(Prefs.MIRROR_SCALE).collectAsState()
+    val pipEnabled by viewModel.pref(Prefs.PIP_ENABLED).collectAsState()
     val scale = runCatching { MirrorScale.valueOf(scalePref) }.getOrDefault(MirrorScale.BEST_FIT)
     var scaleHint by remember { mutableStateOf(false) }
     LaunchedEffect(scaleHint, scalePref) { if (scaleHint) { delay(1500); scaleHint = false } }
@@ -887,7 +890,7 @@ private fun FullscreenVideo(
                 }, modifier = Modifier.dpadFocus()) {
                     Icon(scale.icon(), contentDescription = stringResource(scale.nameRes()), tint = Color.White.copy(alpha = 0.8f))
                 }
-                IconButton(onClick = onPip, modifier = Modifier.dpadFocus()) {
+                if (pipEnabled) IconButton(onClick = onPip, modifier = Modifier.dpadFocus()) {
                     Icon(
                         painterResource(R.drawable.ic_pip), contentDescription = stringResource(R.string.cd_pip),
                         tint = Color.White.copy(alpha = 0.7f)

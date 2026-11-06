@@ -116,6 +116,9 @@ object Prefs {
     val USB_ONLY = bool("usb_only", false, restart = true)
 
     // ---------- car head-unit options ----------
+    // picture-in-picture: many head-unit systems show the PiP window but cannot tap or restore it,
+    // which leaves the app stuck in a black floating box, so it is off unless the user turns it on
+    val PIP_ENABLED = bool("car_pip_enabled", false)
     // full-screen now-playing view as soon as music starts
     val MUSIC_AUTO_FULLSCREEN = bool("car_music_auto_fullscreen", false)
     // how the mirrored picture fills a full-screen car display
