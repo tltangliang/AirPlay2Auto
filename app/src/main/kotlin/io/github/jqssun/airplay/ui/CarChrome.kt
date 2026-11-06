@@ -68,12 +68,15 @@ fun CarUiScale(viewModel: MainViewModel, content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalDensity provides Density(base.density * scale, base.fontScale), content = content)
 }
 
-/** Aim for roughly 440dp of usable height on landscape screens that are much taller than that. */
+/**
+ * Car-sized UI on landscape screens: aim for roughly 230dp of layout height, so text and touch
+ * targets read at a glance from the driver's seat (a 720px, ~1.25x head unit gets about 2.5x).
+ */
 fun autoUiScale(conf: Configuration): Float {
     val w = conf.screenWidthDp
     val h = conf.screenHeightDp
-    if (w <= h || w < 900) return 1f
-    return (h / 440f).coerceIn(1f, 1.75f)
+    if (w <= h || w < 700) return 1f
+    return (h / 230f).coerceIn(1f, 3.5f)
 }
 
 /** Effective percentage shown in settings for the automatic mode. */

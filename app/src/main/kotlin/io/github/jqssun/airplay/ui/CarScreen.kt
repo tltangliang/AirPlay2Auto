@@ -55,6 +55,8 @@ fun CarScreen(viewModel: MainViewModel) {
     val insetBottom by viewModel.pref(Prefs.INSET_BOTTOM_DP).collectAsState()
     val musicBuffer by viewModel.pref(Prefs.MUSIC_BUFFER_MS).collectAsState()
     val fixedVolume by viewModel.pref(Prefs.FIXED_VOLUME).collectAsState()
+    val advMirroring by viewModel.pref(Prefs.ADVERTISE_MIRRORING).collectAsState()
+    val advVideo by viewModel.pref(Prefs.ADVERTISE_VIDEO).collectAsState()
     val autoScale = autoUiScalePercent(androidx.compose.ui.platform.LocalConfiguration.current)
 
 
@@ -133,9 +135,23 @@ fun CarScreen(viewModel: MainViewModel) {
             }
         }
 
+        // ---------- receiver features ----------
+        CarHeader("接收功能")
+        ListItem(
+            headlineContent = { Text("AirPlay 音乐") },
+            supportingContent = { Text("始终开启：在手机的 AirPlay 音频输出中选择本车机播放音乐") },
+            trailingContent = { Switch(checked = true, onCheckedChange = null, enabled = false) }
+        )
+        CarSwitch("屏幕镜像", "在控制中心「屏幕镜像」中显示本车机；默认关闭", advMirroring) {
+            viewModel.set(Prefs.ADVERTISE_MIRRORING, it)
+        }
+        CarSwitch("AirPlay 视频", "允许把视频 App 中的视频投到车机；关闭时视频只以声音播放。默认关闭", advVideo) {
+            viewModel.set(Prefs.ADVERTISE_VIDEO, it)
+        }
+
         // ---------- display ----------
         CarHeader("投屏显示")
-        CarSwitch("镜像连接时自动全屏", "iPhone 开始屏幕镜像后直接全屏显示；也可点画面或全屏按钮进入", mirrorAutoFs) {
+        if (advMirroring) CarSwitch("镜像连接时自动全屏", "iPhone 开始屏幕镜像后直接全屏显示；也可点画面或全屏按钮进入", mirrorAutoFs) {
             viewModel.set(Prefs.AUTO_FULLSCREEN, it)
         }
         CarSwitch("音乐播放时自动全屏", "播放音乐时直接显示全屏封面和控制；也可点右上角全屏按钮进入", musicAutoFs) {
@@ -146,7 +162,7 @@ fun CarScreen(viewModel: MainViewModel) {
             "离开应用时缩成小窗继续显示。很多车机系统无法操作画中画小窗，会出现点不动、回不到应用的黑框，默认关闭；确认车机支持再开启",
             pipEnabled
         ) { viewModel.set(Prefs.PIP_ENABLED, it) }
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        if (advMirroring) Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text("全屏镜像画面比例")
             Text("宽屏车机可选“拉伸”或“裁剪”去掉黑边；全屏时也可点右上角按钮切换",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -162,7 +178,7 @@ fun CarScreen(viewModel: MainViewModel) {
         CarHeader("界面")
         ChipSetting(
             "界面缩放", "放大文字、图标和按钮；自动模式按车机屏幕高度计算（当前约 $autoScale%）",
-            uiScale, listOf(0 to "自动", 100 to "100%", 125 to "125%", 150 to "150%", 175 to "175%", 200 to "200%")
+            uiScale, listOf(0 to "自动", 100 to "100%", 150 to "150%", 200 to "200%", 250 to "250%", 300 to "300%", 350 to "350%")
         ) { viewModel.set(Prefs.UI_SCALE, it) }
         ChipSetting(
             "顶部避让", "界面被车机状态栏遮挡时加大；自动模式读取系统状态栏高度",
@@ -179,8 +195,8 @@ fun CarScreen(viewModel: MainViewModel) {
             viewModel.set(Prefs.FIXED_VOLUME, it)
         }
         ChipSetting(
-            "音乐缓冲", "播放音乐时使用的缓冲时长，卡顿时加大；投屏镜像仍使用低延迟自动缓冲以保证音画同步",
-            musicBuffer, listOf(0 to "自动", 150 to "150ms", 300 to "300ms", 500 to "500ms", 800 to "800ms")
+            "音乐缓冲（延迟）", "缓冲越大越不容易断流，开始播放会相应延迟；默认 2 秒，与常见 AirPlay 音箱一致。屏幕镜像不受影响，仍用低延迟缓冲保证音画同步",
+            musicBuffer, listOf(0 to "自动", 500 to "0.5秒", 1000 to "1秒", 1500 to "1.5秒", 2000 to "2秒")
         ) { viewModel.set(Prefs.MUSIC_BUFFER_MS, it) }
 
         // ---------- autostart ----------

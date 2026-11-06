@@ -20,7 +20,7 @@ iPhone / iPad / Mac 可以通过「屏幕镜像」或 AirPlay，把画面、视�
 - 支持 Android 6.0 及以上（API 23+）
 - 内置 arm64-v8a、armeabi-v7a、x86、x86_64 四种架构，覆盖绝大多数车机，包括 32 位系统和 Intel 方案车机
 - 横屏宽屏车机自动改用侧边导航栏，界面为中文
-- 宽屏车机自动放大界面（文字、图标、按钮），也可手动选择 100%–200%
+- 宽屏车机自动按车机尺寸放大界面（文字、图标、按钮约为手机界面的 2–3 倍），也可手动选择 100%–350%
 - 自动避让车机状态栏和底部快捷栏，被遮挡时可手动调整上下边距
 - 独立包名 `io.github.carairplay`，可与原版共存
 
@@ -44,9 +44,14 @@ iPhone / iPad / Mac 可以通过「屏幕镜像」或 AirPlay，把画面、视�
 - 「安卓原生设置」快捷入口：设置主页、WLAN、热点、蓝牙、显示、声音、应用管理、悬浮窗管理、电池优化名单、语言、日期时间、开发者选项、关于设备
 - 优先打开安卓原生设置（`com.android.settings`），适合桌面隐藏了原生设置的车机；车机没有原生设置时自动改用系统默认的设置页面
 
+**接收功能**
+- 默认只作为 AirPlay 音乐接收器（在手机的 AirPlay 音频输出中选择车机）
+- 屏幕镜像和 AirPlay 视频默认关闭，可在「车机 → 接收功能」中开启
+
 **音频**
 - 默认由车机控制音量：忽略手机端音量调节，始终以最大音量输出，用车机旋钮或方向盘按键调节
-- 音乐默认使用 300ms 固定缓冲，减少 Wi-Fi 抖动造成的卡顿（可选 150–800ms）；屏幕镜像仍用低延迟自动缓冲，保证音画同步
+- 音乐默认使用 2 秒缓冲（与常见 AirPlay 音箱相同），足以等到丢失的数据包重传，避免断流；可选 0.5–2 秒。屏幕镜像仍用低延迟自动缓冲，保证音画同步
+- 接收时保持 Wi-Fi 高性能模式，减少省电造成的数据包堆积
 
 **全屏显示**
 - 屏幕镜像：点画面或全屏按钮进入全屏，可选「适应 / 拉伸 / 裁剪」，宽屏车机去黑边，选择会被记住
@@ -60,7 +65,7 @@ iPhone / iPad / Mac 可以通过「屏幕镜像」或 AirPlay，把画面、视�
 1. 安装 APK 并打开应用，进入「车机」页，在「系统权限」里把各项权限打开
 2. 点「打开系统热点设置」，在系统中设置并开启车机热点
 3. iPhone 连接车机热点，或与车机连接同一个 Wi-Fi
-4. 在 iPhone 控制中心点「屏幕镜像」，选择「AirPlay2Auto」（设备名称可在「设置」里修改）
+4. 在 iPhone 控制中心的音乐卡片点 AirPlay 图标，选择「AirPlay2Auto」（开启屏幕镜像后也可在「屏幕镜像」中选择）（设备名称可在「设置」里修改）
 
 ### 编译
 
@@ -93,7 +98,7 @@ Cast screen mirroring, video and music from an iPhone, iPad or Mac to the head u
 - Android 6.0 and later (API 23+)
 - Ships arm64-v8a, armeabi-v7a, x86 and x86_64, covering most head units, including 32-bit systems and Intel-based units
 - Wide landscape screens get a side navigation rail; UI in Chinese and English
-- The UI is enlarged automatically on wide car screens (text, icons, buttons), or set manually from 100% to 200%
+- The UI is enlarged automatically to car size on wide screens (text, icons and buttons roughly 2–3× phone size), or set manually from 100% to 350%
 - Keeps clear of the head unit's status bar and dock; top and bottom margins can be adjusted if something is covered
 - Separate package name `io.github.carairplay`, so it can be installed next to the original app
 
@@ -117,9 +122,14 @@ Cast screen mirroring, video and music from an iPhone, iPad or Mac to the head u
 - "Native Android settings" shortcuts: Settings home, Wi-Fi, hotspot, Bluetooth, display, sound, apps, overlay permissions, battery optimization list, language, date and time, developer options, about device
 - Opens the native Android settings (`com.android.settings`) first, which helps on head units whose launcher hides them; falls back to the system default settings screen when a unit has no native settings
 
+**Receiver features**
+- By default the head unit is an AirPlay music receiver only (pick it in the phone's AirPlay audio output)
+- Screen mirroring and AirPlay video are off by default and can be turned on under "Car → Receiver features"
+
 **Audio**
 - The head unit controls volume by default: the phone's volume changes are ignored and audio plays at full level, adjusted with the head unit's knob or steering-wheel buttons
-- Music uses a fixed 300 ms buffer by default to ride out Wi-Fi jitter (150–800 ms selectable); screen mirroring keeps the low-latency adaptive buffer for lip sync
+- Music uses a 2-second buffer by default (as typical AirPlay speakers do), long enough for lost packets to be resent instead of the audio cutting out; 0.5–2 s selectable. Screen mirroring keeps the low-latency adaptive buffer for lip sync
+- Keeps Wi-Fi in high-performance mode while receiving, so power saving doesn't bunch packets up
 
 **Full screen**
 - Screen mirroring: tap the picture or the fullscreen button; choose fit / stretch / crop to remove black bars on wide car displays (remembered)
@@ -133,7 +143,7 @@ Cast screen mirroring, video and music from an iPhone, iPad or Mac to the head u
 1. Install the APK, open the app, go to the "Car" tab and turn on the permissions under "System permissions"
 2. Tap "Open system hotspot settings" and set up and turn on the hotspot in the system
 3. Connect the iPhone to the head unit's hotspot, or put both on the same Wi-Fi
-4. On the iPhone, open Control Center, tap Screen Mirroring and choose "AirPlay2Auto" (the device name can be changed in Settings)
+4. On the iPhone, open Control Center, tap the AirPlay icon on the music card and choose "AirPlay2Auto" (or use Screen Mirroring once it is turned on) (the device name can be changed in Settings)
 
 ### Build
 

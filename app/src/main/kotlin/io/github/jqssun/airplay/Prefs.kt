@@ -109,8 +109,8 @@ object Prefs {
     val IDLE_PREVIEW = bool("idle_preview", false)
     val AUTO_FULLSCREEN = bool("auto_fullscreen", true)
     val KEEP_SCREEN_ON = bool("keep_screen_on", true)
-    val ADVERTISE_VIDEO = bool("advertise_video", true, restart = true)
-    val ADVERTISE_MIRRORING = bool("advertise_mirroring", true, restart = true)
+    val ADVERTISE_VIDEO = bool("advertise_video", false, restart = true)
+    val ADVERTISE_MIRRORING = bool("advertise_mirroring", false, restart = true)
     val ADVERTISE_AUDIO = bool("advertise_audio", true, restart = true)
     val LAUNCH_ON_CONNECT = bool("launch_on_connect", true)
     val USB_ONLY = bool("usb_only", false, restart = true)
@@ -119,12 +119,14 @@ object Prefs {
     // picture-in-picture: many head-unit systems show the PiP window but cannot tap or restore it,
     // which leaves the app stuck in a black floating box, so it is off unless the user turns it on
     val PIP_ENABLED = bool("car_pip_enabled", false)
-    // fixed jitter buffer for music (audio-only sessions); mirroring keeps the adaptive buffer for lip sync
-    val MUSIC_BUFFER_MS = int("car_music_buffer_ms", 300, 0..1000)
+    // fixed jitter buffer for music (audio-only sessions); mirroring keeps the adaptive buffer for lip sync.
+    // UxPlay holds back delivery for up to ~2 s (256 packets) waiting for resent packets, so a buffer
+    // close to that rides out losses instead of running dry and cutting out
+    val MUSIC_BUFFER_MS = int("car_music_buffer_ms", 2000, 0..2000)
     // ignore the sender's volume: play at full level and let the head unit control loudness
     val FIXED_VOLUME = bool("car_fixed_volume", true)
     // UI scale in percent, 0 = automatic for wide car screens
-    val UI_SCALE = int("car_ui_scale", 0, 0..250)
+    val UI_SCALE = int("car_ui_scale", 0, 0..400)
     // space kept clear of the head unit's status bar / dock in dp, -1 = automatic
     val INSET_TOP_DP = int("car_inset_top_dp", -1, -1..200)
     val INSET_BOTTOM_DP = int("car_inset_bottom_dp", -1, -1..200)

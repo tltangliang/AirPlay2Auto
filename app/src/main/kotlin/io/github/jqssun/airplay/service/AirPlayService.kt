@@ -337,7 +337,11 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         lifecycleScope.launch {
             // music has no picture to stay in sync with, so it gets a larger fixed buffer against Wi-Fi jitter
             combine(prefs.audioConfigFlow(), _audioOnly, prefs.observe { this[Prefs.MUSIC_BUFFER_MS] }) { cfg, audioOnly, musicMs ->
-                if (audioOnly && musicMs > 0) cfg.copy(cushionMs = musicMs, lowLatency = false) else cfg
+                if (audioOnly && musicMs > 0) {
+                    // also give the output stream ~90 ms of headroom against CPU stalls on slow head units
+                    cfg.copy(cushionMs = musicMs, lowLatency = false,
+                        oboeBufferFrames = if (cfg.oboeBufferFrames > 0) cfg.oboeBufferFrames else MUSIC_OUTPUT_FRAMES)
+                } else cfg
             }
                 .debounce(AUDIO_CONFIG_DEBOUNCE_MS)
                 .collect { audioRenderer.updateConfig(it) }
@@ -458,6 +462,14 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "airplay:server").apply { acquire() }
+        // keep the Wi-Fi radio out of power save while receiving: power-save wakeups bunch packets up
+        _wifiLock = runCatching {
+            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+            @Suppress("DEPRECATION")
+            val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) android.net.wifi.WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+                else android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF
+            wm.createWifiLock(mode, "airplay:wifi").apply { setReferenceCounted(false); acquire() }
+        }.getOrNull()
 
         nsdManager = NsdServiceManager(this).apply { acquireMulticastLock() }
 
@@ -597,6 +609,8 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         nsdManager = null
         wakeLock?.release()
         wakeLock = null
+        _wifiLock?.let { runCatching { it.release() } }
+        _wifiLock = null
         _serverState.value = ServerState.ERROR
         if (foregroundStarted) {
             ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
@@ -633,6 +647,8 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         nsdManager = null
         wakeLock?.release()
         wakeLock = null
+        _wifiLock?.let { runCatching { it.release() } }
+        _wifiLock = null
         videoRenderer.release()
         airPlayVideoPlayer.stop()
         mediaSession?.isActive = false
@@ -817,6 +833,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     @Volatile private var _fixedVol = true
+    private var _wifiLock: android.net.wifi.WifiManager.WifiLock? = null
 
     fun clientVolume(): Float = _clientVol ?: _clientVolExpected()
 
@@ -1289,6 +1306,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         const val ACTION_PREV = "io.github.jqssun.airplay.PREV"
         const val ACTION_START_SERVER = "io.github.jqssun.airplay.START_SERVER"
         const val EXTRA_DELAY_S = "delay_s"
+        private const val MUSIC_OUTPUT_FRAMES = 4096
         const val EXTRA_FROM_BOOT = "from_boot"
         // shared with dpad/double-tap seeks
         const val VIDEO_SEEK_STEP_MS = 10_000L

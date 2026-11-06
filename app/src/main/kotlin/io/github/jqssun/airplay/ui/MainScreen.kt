@@ -13,6 +13,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -553,18 +555,23 @@ fun MainScreen(
       // car head units are wide and short: use a side rail instead of a bottom bar
       if (maxWidth > maxHeight && maxHeight < 800.dp) {
         Row(Modifier.fillMaxSize()) {
-            NavigationRail(windowInsets = WindowInsets(0)) {
-                Spacer(Modifier.weight(1f))
-                Tab.entries.forEach { t ->
-                    NavigationRailItem(
-                        selected = tab == t,
-                        onClick = { tab = t },
-                        icon = { Icon(t.icon, null) },
-                        label = { Text(stringResource(t.labelRes)) },
-                        modifier = Modifier.dpadFocus()
-                    )
+            // scrollable so enlarged tabs never get clipped on short screens
+            Surface(color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxHeight()) {
+                Column(
+                    Modifier.fillMaxHeight().width(88.dp).verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Tab.entries.forEach { t ->
+                        NavigationRailItem(
+                            selected = tab == t,
+                            onClick = { tab = t },
+                            icon = { Icon(t.icon, null) },
+                            label = { Text(stringResource(t.labelRes)) },
+                            modifier = Modifier.dpadFocus()
+                        )
+                    }
                 }
-                Spacer(Modifier.weight(1f))
             }
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -688,13 +695,10 @@ private fun OverviewContent(
         if (tv) startFocus.requestFocus()
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // content area
+    val contentArea: @Composable (Modifier) -> Unit = { areaModifier ->
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(16.dp)
+            modifier = areaModifier
+                .padding(12.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
@@ -775,65 +779,79 @@ private fun OverviewContent(
             }
         }
 
-        // controls
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = serverName,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        val statusColor by animateColorAsState(
-                            if (grant) MaterialTheme.colorScheme.error else when (state) {
-                                ServerState.RUNNING -> MaterialTheme.colorScheme.primary
-                                ServerState.ERROR -> MaterialTheme.colorScheme.error
-                                ServerState.STOPPED -> MaterialTheme.colorScheme.onSurfaceVariant
-                            }, label = "status"
-                        )
-                        Text(
-                            text = if (grant) stringResource(R.string.local_network_label) else when (state) {
-                                ServerState.RUNNING -> stringResource(R.string.connected_count, connections)
-                                ServerState.ERROR -> stringResource(R.string.error_label)
-                                ServerState.STOPPED -> stringResource(R.string.stopped_label)
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = statusColor
-                        )
-                    }
+    }
 
-                    val settings = localNetwork == LocalNetworkAccess.SETTINGS
-                    val (icon, label, action) = when {
-                        grant -> Triple(
-                            if (settings) Icons.Default.Settings else Icons.Default.LockOpen,
-                            if (settings) R.string.btn_open_settings else R.string.btn_allow,
-                            onLocalNetwork
-                        )
-                        state == ServerState.RUNNING -> Triple(Icons.Default.Stop, R.string.btn_stop, viewModel::stopServer)
-                        else -> Triple(Icons.Default.PlayArrow, R.string.btn_start, viewModel::startServer)
-                    }
-                    FilledTonalButton(
-                        onClick = action,
-                        modifier = Modifier.dpadFocus().focusRequester(startFocus)
+    val statusColor by animateColorAsState(
+        if (grant) MaterialTheme.colorScheme.error else when (state) {
+            ServerState.RUNNING -> MaterialTheme.colorScheme.primary
+            ServerState.ERROR -> MaterialTheme.colorScheme.error
+            ServerState.STOPPED -> MaterialTheme.colorScheme.onSurfaceVariant
+        }, label = "status"
+    )
+    val statusText = if (grant) stringResource(R.string.local_network_label) else when (state) {
+        ServerState.RUNNING -> stringResource(R.string.connected_count, connections)
+        ServerState.ERROR -> stringResource(R.string.error_label)
+        ServerState.STOPPED -> stringResource(R.string.stopped_label)
+    }
+    val settings = localNetwork == LocalNetworkAccess.SETTINGS
+    val (icon, label, action) = when {
+        grant -> Triple(
+            if (settings) Icons.Default.Settings else Icons.Default.LockOpen,
+            if (settings) R.string.btn_open_settings else R.string.btn_allow,
+            onLocalNetwork
+        )
+        state == ServerState.RUNNING -> Triple(Icons.Default.Stop, R.string.btn_stop, viewModel::stopServer)
+        else -> Triple(Icons.Default.PlayArrow, R.string.btn_start, viewModel::startServer)
+    }
+    val actionButton: @Composable (Modifier) -> Unit = { m ->
+        FilledTonalButton(onClick = action, modifier = m.dpadFocus().focusRequester(startFocus)) {
+            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(stringResource(label))
+        }
+    }
+
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // wide, short car screens: server panel on the side so the content keeps the full height
+        if (maxWidth > maxHeight * 1.5f && maxHeight < 520.dp) {
+            val panelWidth = (maxWidth * 0.22f).coerceIn(150.dp, 260.dp)
+            Row(Modifier.fillMaxSize()) {
+                contentArea(Modifier.weight(1f).fillMaxHeight())
+                Card(
+                    modifier = Modifier.width(panelWidth).fillMaxHeight().padding(top = 12.dp, end = 12.dp, bottom = 12.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(
+                        Modifier.fillMaxSize().padding(14.dp),
+                        verticalArrangement = Arrangement.Center
                     ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(stringResource(label))
+                        Text(serverName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Spacer(Modifier.height(4.dp))
+                        Text(statusText, style = MaterialTheme.typography.bodyMedium, color = statusColor)
+                        Spacer(Modifier.height(16.dp))
+                        actionButton(Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        } else {
+            Column(Modifier.fillMaxSize()) {
+                contentArea(Modifier.fillMaxWidth().weight(1f))
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 12.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(serverName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.height(2.dp))
+                            Text(statusText, style = MaterialTheme.typography.bodySmall, color = statusColor)
+                        }
+                        actionButton(Modifier)
                     }
                 }
             }
@@ -981,10 +999,11 @@ private fun NowPlayingContent(viewModel: MainViewModel) {
     val track by viewModel.trackInfo.collectAsState()
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val coverMax = maxWidth * 0.42f
+        val fit = musicFit(maxHeight - 32.dp)
         if (maxWidth > maxHeight * 1.2f) {
             // wide car screen: cover fills the height on the left, info and controls on the right
             Row(
-                Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 20.dp),
+                Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 CoverArt(
@@ -993,11 +1012,14 @@ private fun NowPlayingContent(viewModel: MainViewModel) {
                         .aspectRatio(1f, matchHeightConstraintsFirst = true),
                     iconSize = 96.dp
                 )
-                Spacer(Modifier.width(32.dp))
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                    TrackInfoText(track, Alignment.Start)
-                    Spacer(Modifier.height(20.dp))
-                    MusicControls(viewModel)
+                Spacer(Modifier.width(28.dp))
+                Column(
+                    Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    TrackInfoText(track, Alignment.Start, level = fit.level)
+                    Spacer(Modifier.height(fit.gap))
+                    MusicControls(viewModel, fit.controls, fit.progress)
                 }
             }
         } else {
@@ -1020,18 +1042,23 @@ private fun NowPlayingContent(viewModel: MainViewModel) {
 private fun ColumnScope.TrackInfoText(
     track: io.github.jqssun.airplay.audio.TrackInfo,
     align: Alignment.Horizontal,
-    color: Color = MaterialTheme.colorScheme.onSurface
+    color: Color = MaterialTheme.colorScheme.onSurface,
+    // 0 = title/artist/album, 1 = no album, 2 = smaller title, no album
+    level: Int = 0
 ) {
     Text(
         text = track.title.ifEmpty { stringResource(R.string.unknown_track) },
-        style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = color,
-        maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(align)
-    )
-    if (track.artist.isNotEmpty()) Text(
-        track.artist, style = MaterialTheme.typography.titleLarge, color = color.copy(alpha = 0.85f),
+        style = if (level >= 2) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineMedium,
+        fontWeight = FontWeight.Bold, color = color,
         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(align)
     )
-    if (track.album.isNotEmpty()) Text(
+    if (track.artist.isNotEmpty()) Text(
+        track.artist,
+        style = if (level >= 2) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+        color = color.copy(alpha = 0.85f),
+        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(align)
+    )
+    if (level == 0 && track.album.isNotEmpty()) Text(
         track.album, style = MaterialTheme.typography.titleMedium, color = color.copy(alpha = 0.6f),
         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(align)
     )
@@ -1083,6 +1110,7 @@ private fun FullscreenMusic(viewModel: MainViewModel, onExit: () -> Unit) {
             }
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.2f), Color.Black.copy(alpha = 0.7f)))))
             val coverMax = maxWidth * 0.45f
+            val fit = musicFit(maxHeight - 48.dp)
             if (maxWidth > maxHeight) {
                 Row(
                     Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 40.dp, vertical = 24.dp),
@@ -1095,10 +1123,13 @@ private fun FullscreenMusic(viewModel: MainViewModel, onExit: () -> Unit) {
                         iconSize = 120.dp
                     )
                     Spacer(Modifier.width(40.dp))
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                        TrackInfoText(track, Alignment.Start, Color.White)
-                        Spacer(Modifier.height(24.dp))
-                        MusicControls(viewModel)
+                    Column(
+                        Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        TrackInfoText(track, Alignment.Start, Color.White, level = fit.level)
+                        Spacer(Modifier.height(fit.gap))
+                        MusicControls(viewModel, fit.controls, fit.progress)
                     }
                 }
             } else {
@@ -1123,20 +1154,21 @@ private fun FullscreenMusic(viewModel: MainViewModel, onExit: () -> Unit) {
 
 @Composable
 @AndroidxOptIn(UnstableApi::class)
-private fun MusicControls(viewModel: MainViewModel) {
+private fun MusicControls(viewModel: MainViewModel, scale: Float = 1f, showProgress: Boolean = true) {
+    fun d(v: Int) = (v * scale).dp
     // volume is left to the head unit, so only progress and transport controls are shown
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         val player = viewModel.dacpPlayer ?: return@Column
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        if (showProgress) Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             ProvideTextStyle(MaterialTheme.typography.titleMedium) {
                 PositionText(player, Modifier.padding(end = 12.dp))
                 Box(modifier = Modifier.weight(1f)) { ProgressSlider(player) }
                 DurationText(player, Modifier.padding(start = 12.dp))
             }
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(d(8)))
         Row(
-            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+            horizontalArrangement = Arrangement.spacedBy(d(14), Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -1145,20 +1177,36 @@ private fun MusicControls(viewModel: MainViewModel) {
                 contentDescription = stringResource(R.string.cd_rewind),
                 onBegin = { viewModel.audioScanBegin(false) },
                 onEnd = { viewModel.audioScanEnd() },
-                size = 64.dp, iconSize = 36.dp
+                size = d(64), iconSize = d(36)
             )
-            PreviousButton(player, modifier = Modifier.size(72.dp).dpadFocus(CircleShape), iconSize = 44.dp)
-            PlayPauseButton(player, modifier = Modifier.size(96.dp).dpadFocus(CircleShape), iconSize = 64.dp)
-            NextButton(player, modifier = Modifier.size(72.dp).dpadFocus(CircleShape), iconSize = 44.dp)
+            PreviousButton(player, modifier = Modifier.size(d(72)).dpadFocus(CircleShape), iconSize = d(44))
+            PlayPauseButton(player, modifier = Modifier.size(d(96)).dpadFocus(CircleShape), iconSize = d(64))
+            NextButton(player, modifier = Modifier.size(d(72)).dpadFocus(CircleShape), iconSize = d(44))
             HoldScanButton(
                 icon = Icons.Default.FastForward,
                 contentDescription = stringResource(R.string.cd_fast_forward),
                 onBegin = { viewModel.audioScanBegin(true) },
                 onEnd = { viewModel.audioScanEnd() },
-                size = 64.dp, iconSize = 36.dp
+                size = d(64), iconSize = d(36)
             )
         }
     }
+}
+
+/** How much text and how large controls fit beside the cover at a given height. */
+private data class MusicFit(
+    val level: Int,
+    val controls: Float,
+    val gap: androidx.compose.ui.unit.Dp,
+    val progress: Boolean = true,
+)
+
+// on very short screens the progress bar goes first, so the buttons stay large enough to hit while driving
+private fun musicFit(h: androidx.compose.ui.unit.Dp): MusicFit = when {
+    h >= 290.dp -> MusicFit(0, 1f, 20.dp)
+    h >= 230.dp -> MusicFit(1, 0.85f, 12.dp)
+    h >= 190.dp -> MusicFit(2, 0.75f, 8.dp)
+    else -> MusicFit(2, 0.7f, 8.dp, progress = false)
 }
 
 private const val VIDEO_OVERLAY_HIDE_MS = 4000L
