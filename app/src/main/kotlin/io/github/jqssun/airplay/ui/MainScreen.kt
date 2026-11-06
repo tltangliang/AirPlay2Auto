@@ -547,11 +547,13 @@ fun MainScreen(
             onExitFullscreen = { fullscreen = false },
             onPip = onPip
         )
-    } else BoxWithConstraints(Modifier.fillMaxSize()) {
+    } else BoxWithConstraints(
+        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(carChromePadding(viewModel))
+    ) {
       // car head units are wide and short: use a side rail instead of a bottom bar
       if (maxWidth > maxHeight && maxHeight < 800.dp) {
-        Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).windowInsetsPadding(WindowInsets.safeDrawing)) {
-            NavigationRail {
+        Row(Modifier.fillMaxSize()) {
+            NavigationRail(windowInsets = WindowInsets(0)) {
                 Spacer(Modifier.weight(1f))
                 Tab.entries.forEach { t ->
                     NavigationRailItem(
@@ -581,6 +583,7 @@ fun MainScreen(
         }
       } else {
         Scaffold(
+            contentWindowInsets = WindowInsets(0),
             bottomBar = {
                 Column {
                     AudioMiniController(
@@ -588,7 +591,7 @@ fun MainScreen(
                         visible = audioOnly && connections > 0 && tab != Tab.OVERVIEW,
                         onClick = { tab = Tab.OVERVIEW }
                     )
-                    NavigationBar {
+                    NavigationBar(windowInsets = WindowInsets(0)) {
                         Tab.entries.forEach { t ->
                             NavigationBarItem(
                                 selected = tab == t,
@@ -935,11 +938,13 @@ private fun HoldScanButton(
     contentDescription: String,
     onBegin: () -> Unit,
     onEnd: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = 48.dp,
+    iconSize: androidx.compose.ui.unit.Dp = 24.dp
 ) {
     Box(
         modifier = modifier
-            .size(48.dp)
+            .size(size)
             .clip(CircleShape)
             .pointerInput(Unit) {
                 detectTapGestures(onPress = {
@@ -953,7 +958,7 @@ private fun HoldScanButton(
             },
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription)
+        Icon(icon, contentDescription, modifier = Modifier.size(iconSize))
     }
 }
 
@@ -974,48 +979,62 @@ private fun AudioMiniController(viewModel: MainViewModel, visible: Boolean, onCl
 @AndroidxOptIn(UnstableApi::class)
 private fun NowPlayingContent(viewModel: MainViewModel) {
     val track by viewModel.trackInfo.collectAsState()
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        CoverArt(track, Modifier.weight(1f, fill = false).aspectRatio(1f).fillMaxWidth(0.7f))
-
-        Spacer(Modifier.height(20.dp))
-
-        // track info
-        Text(
-            text = track.title.ifEmpty { stringResource(R.string.unknown_track) },
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        if (track.artist.isNotEmpty()) {
-            Text(
-                text = track.artist,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val coverMax = maxWidth * 0.42f
+        if (maxWidth > maxHeight * 1.2f) {
+            // wide car screen: cover fills the height on the left, info and controls on the right
+            Row(
+                Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                CoverArt(
+                    track,
+                    Modifier.widthIn(max = coverMax).fillMaxHeight()
+                        .aspectRatio(1f, matchHeightConstraintsFirst = true),
+                    iconSize = 96.dp
+                )
+                Spacer(Modifier.width(32.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                    TrackInfoText(track, Alignment.Start)
+                    Spacer(Modifier.height(20.dp))
+                    MusicControls(viewModel)
+                }
+            }
+        } else {
+            Column(
+                Modifier.fillMaxSize().padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                CoverArt(track, Modifier.weight(1f, fill = false).aspectRatio(1f).fillMaxWidth(0.85f), iconSize = 96.dp)
+                Spacer(Modifier.height(20.dp))
+                TrackInfoText(track, Alignment.CenterHorizontally)
+                Spacer(Modifier.height(16.dp))
+                MusicControls(viewModel)
+            }
         }
-        if (track.album.isNotEmpty()) {
-            Text(
-                text = track.album,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
-        MusicControls(viewModel)
     }
+}
+
+@Composable
+private fun ColumnScope.TrackInfoText(
+    track: io.github.jqssun.airplay.audio.TrackInfo,
+    align: Alignment.Horizontal,
+    color: Color = MaterialTheme.colorScheme.onSurface
+) {
+    Text(
+        text = track.title.ifEmpty { stringResource(R.string.unknown_track) },
+        style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = color,
+        maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(align)
+    )
+    if (track.artist.isNotEmpty()) Text(
+        track.artist, style = MaterialTheme.typography.titleLarge, color = color.copy(alpha = 0.85f),
+        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(align)
+    )
+    if (track.album.isNotEmpty()) Text(
+        track.album, style = MaterialTheme.typography.titleMedium, color = color.copy(alpha = 0.6f),
+        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(align)
+    )
 }
 
 @Composable
@@ -1063,30 +1082,21 @@ private fun FullscreenMusic(viewModel: MainViewModel, onExit: () -> Unit) {
                 )
             }
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.2f), Color.Black.copy(alpha = 0.7f)))))
-            val info: @Composable ColumnScope.(Alignment.Horizontal) -> Unit = { align ->
-                Text(
-                    track.title.ifEmpty { stringResource(R.string.unknown_track) },
-                    style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = Color.White,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(align)
-                )
-                if (track.artist.isNotEmpty()) Text(
-                    track.artist, style = MaterialTheme.typography.titleLarge, color = Color.White.copy(alpha = 0.85f),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(align)
-                )
-                if (track.album.isNotEmpty()) Text(
-                    track.album, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(alpha = 0.6f),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(align)
-                )
-            }
+            val coverMax = maxWidth * 0.45f
             if (maxWidth > maxHeight) {
                 Row(
                     Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 40.dp, vertical = 24.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CoverArt(track, Modifier.fillMaxHeight(0.85f).aspectRatio(1f), iconSize = 96.dp)
+                    CoverArt(
+                        track,
+                        Modifier.widthIn(max = coverMax).fillMaxHeight(0.92f)
+                            .aspectRatio(1f, matchHeightConstraintsFirst = true),
+                        iconSize = 120.dp
+                    )
                     Spacer(Modifier.width(40.dp))
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                        info(Alignment.Start)
+                        TrackInfoText(track, Alignment.Start, Color.White)
                         Spacer(Modifier.height(24.dp))
                         MusicControls(viewModel)
                     }
@@ -1098,7 +1108,7 @@ private fun FullscreenMusic(viewModel: MainViewModel, onExit: () -> Unit) {
                 ) {
                     CoverArt(track, Modifier.fillMaxWidth(0.85f).aspectRatio(1f), iconSize = 96.dp)
                     Spacer(Modifier.height(28.dp))
-                    info(Alignment.CenterHorizontally)
+                    TrackInfoText(track, Alignment.CenterHorizontally, Color.White)
                     Spacer(Modifier.height(20.dp))
                     MusicControls(viewModel)
                 }
@@ -1114,117 +1124,42 @@ private fun FullscreenMusic(viewModel: MainViewModel, onExit: () -> Unit) {
 @Composable
 @AndroidxOptIn(UnstableApi::class)
 private fun MusicControls(viewModel: MainViewModel) {
+    // volume is left to the head unit, so only progress and transport controls are shown
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        val player = viewModel.dacpPlayer
-        if (player != null) {
-            // BottomControls' default row, minus its video-overlay gradient
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                PositionText(player, Modifier.padding(end = 8.dp))
+        val player = viewModel.dacpPlayer ?: return@Column
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            ProvideTextStyle(MaterialTheme.typography.titleMedium) {
+                PositionText(player, Modifier.padding(end = 12.dp))
                 Box(modifier = Modifier.weight(1f)) { ProgressSlider(player) }
-                DurationText(player, Modifier.padding(start = 8.dp))
+                DurationText(player, Modifier.padding(start = 12.dp))
             }
-
-            Spacer(Modifier.height(8.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                HoldScanButton(
-                    icon = Icons.Default.FastRewind,
-                    contentDescription = stringResource(R.string.cd_rewind),
-                    onBegin = { viewModel.audioScanBegin(false) },
-                    onEnd = { viewModel.audioScanEnd() }
-                )
-                PreviousButton(player, modifier = Modifier.dpadFocus())
-                PlayPauseButton(
-                    player,
-                    modifier = Modifier.size(63.dp).dpadFocus(CircleShape),
-                    iconSize = 40.dp
-                )
-                NextButton(player, modifier = Modifier.dpadFocus())
-                HoldScanButton(
-                    icon = Icons.Default.FastForward,
-                    contentDescription = stringResource(R.string.cd_fast_forward),
-                    onBegin = { viewModel.audioScanBegin(true) },
-                    onEnd = { viewModel.audioScanEnd() }
-                )
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            val context = LocalContext.current
-            val serverVolume = remember { ServerVolumeState(context) }
-            DisposableEffect(serverVolume) { serverVolume.handleLifecycle(this) }
-            VolumeSlider(
-                icon = painterResource(R.drawable.ic_download),
-                label = stringResource(R.string.volume_server),
-                value = serverVolume.percentage / 100f,
-                onValueChange = { serverVolume.update((it * 100).roundToInt()) },
-                onStep = { serverVolume.adjust(it > 0) }
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            HoldScanButton(
+                icon = Icons.Default.FastRewind,
+                contentDescription = stringResource(R.string.cd_rewind),
+                onBegin = { viewModel.audioScanBegin(false) },
+                onEnd = { viewModel.audioScanEnd() },
+                size = 64.dp, iconSize = 36.dp
             )
-
-            val clientVolume by viewModel.clientVolume.collectAsState()
-            val clientAdjustable by viewModel.clientVolumeAdjustable.collectAsState()
-            // sender reports back only after each dacp step
-            var clientDrag by remember { mutableStateOf<Float?>(null) }
-            val clientShown = clientDrag ?: clientVolume
-            VolumeSlider(
-                icon = painterResource(R.drawable.ic_upload),
-                label = stringResource(R.string.volume_client),
-                value = clientShown,
-                enabled = clientAdjustable,
-                onValueChange = { clientDrag = it; viewModel.setClientVolume(it) },
-                onValueChangeFinished = { clientDrag = null },
-                onStep = { viewModel.setClientVolume((clientShown + it * CLIENT_VOLUME_STEP).coerceIn(0f, 1f)) }
+            PreviousButton(player, modifier = Modifier.size(72.dp).dpadFocus(CircleShape), iconSize = 44.dp)
+            PlayPauseButton(player, modifier = Modifier.size(96.dp).dpadFocus(CircleShape), iconSize = 64.dp)
+            NextButton(player, modifier = Modifier.size(72.dp).dpadFocus(CircleShape), iconSize = 44.dp)
+            HoldScanButton(
+                icon = Icons.Default.FastForward,
+                contentDescription = stringResource(R.string.cd_fast_forward),
+                onBegin = { viewModel.audioScanBegin(true) },
+                onEnd = { viewModel.audioScanEnd() },
+                size = 64.dp, iconSize = 36.dp
             )
         }
     }
 }
-
-@Composable
-private fun VolumeSlider(
-    icon: Painter,
-    label: String,
-    value: Float,
-    onValueChange: (Float) -> Unit,
-    onStep: (Int) -> Unit,
-    enabled: Boolean = true,
-    onValueChangeFinished: (() -> Unit)? = null
-) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Slider(
-                value = value,
-                onValueChange = onValueChange,
-                enabled = enabled,
-                onValueChangeFinished = onValueChangeFinished,
-                modifier = Modifier
-                    .semantics { contentDescription = label }
-                    .dpadFocus()
-                    .dpadAdjust(onLeft = { onStep(-1) }, onRight = { onStep(1) })
-            )
-        }
-        Spacer(Modifier.width(12.dp))
-        Text(
-            text = stringResource(R.string.volume_value, (value * 100).roundToInt()),
-            style = MaterialTheme.typography.labelLarge,
-            textAlign = TextAlign.End,
-            modifier = Modifier.widthIn(min = 40.dp)
-        )
-    }
-}
-
-// sender has 16 volume steps above mute
-private const val CLIENT_VOLUME_STEP = 1f / 16
 
 private const val VIDEO_OVERLAY_HIDE_MS = 4000L
 

@@ -50,6 +50,12 @@ fun CarScreen(viewModel: MainViewModel) {
     val mirrorAutoFs by viewModel.pref(Prefs.AUTO_FULLSCREEN).collectAsState()
     val mirrorScale by viewModel.pref(Prefs.MIRROR_SCALE).collectAsState()
     val pipEnabled by viewModel.pref(Prefs.PIP_ENABLED).collectAsState()
+    val uiScale by viewModel.pref(Prefs.UI_SCALE).collectAsState()
+    val insetTop by viewModel.pref(Prefs.INSET_TOP_DP).collectAsState()
+    val insetBottom by viewModel.pref(Prefs.INSET_BOTTOM_DP).collectAsState()
+    val musicBuffer by viewModel.pref(Prefs.MUSIC_BUFFER_MS).collectAsState()
+    val fixedVolume by viewModel.pref(Prefs.FIXED_VOLUME).collectAsState()
+    val autoScale = autoUiScalePercent(androidx.compose.ui.platform.LocalConfiguration.current)
 
 
     // live status, refreshed periodically and on resume
@@ -152,6 +158,31 @@ fun CarScreen(viewModel: MainViewModel) {
             }
         }
 
+        // ---------- interface ----------
+        CarHeader("界面")
+        ChipSetting(
+            "界面缩放", "放大文字、图标和按钮；自动模式按车机屏幕高度计算（当前约 $autoScale%）",
+            uiScale, listOf(0 to "自动", 100 to "100%", 125 to "125%", 150 to "150%", 175 to "175%", 200 to "200%")
+        ) { viewModel.set(Prefs.UI_SCALE, it) }
+        ChipSetting(
+            "顶部避让", "界面被车机状态栏遮挡时加大；自动模式读取系统状态栏高度",
+            insetTop, listOf(-1 to "自动", 0 to "0", 24 to "24", 36 to "36", 48 to "48", 64 to "64", 80 to "80")
+        ) { viewModel.set(Prefs.INSET_TOP_DP, it) }
+        ChipSetting(
+            "底部避让", "界面被车机底部快捷栏遮挡时加大",
+            insetBottom, listOf(-1 to "自动", 0 to "0", 24 to "24", 36 to "36", 48 to "48", 64 to "64", 80 to "80")
+        ) { viewModel.set(Prefs.INSET_BOTTOM_DP, it) }
+
+        // ---------- audio ----------
+        CarHeader("音频")
+        CarSwitch("由车机控制音量", "忽略手机端音量调节，始终以最大音量输出，音量用车机旋钮或方向盘按键调节", fixedVolume) {
+            viewModel.set(Prefs.FIXED_VOLUME, it)
+        }
+        ChipSetting(
+            "音乐缓冲", "播放音乐时使用的缓冲时长，卡顿时加大；投屏镜像仍使用低延迟自动缓冲以保证音画同步",
+            musicBuffer, listOf(0 to "自动", 150 to "150ms", 300 to "300ms", 500 to "500ms", 800 to "800ms")
+        ) { viewModel.set(Prefs.MUSIC_BUFFER_MS, it) }
+
         // ---------- autostart ----------
         CarHeader("自动启动")
         CarSwitch("开机 / ACC 上电自动启动", "车机开机或点火后自动在后台开启 AirPlay 接收", bootStart) {
@@ -191,6 +222,21 @@ fun CarScreen(viewModel: MainViewModel) {
         CarHeader("安卓原生设置")
         NativeSettingsSection()
         Spacer(Modifier.height(24.dp))
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChipSetting(title: String, description: String, value: Int, options: List<Pair<Int, String>>, onSelect: (Int) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(title)
+        Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(6.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEach { (v, label) ->
+                FilterChip(selected = value == v, onClick = { onSelect(v) }, label = { Text(label) }, modifier = Modifier.dpadFocus())
+            }
+        }
     }
 }
 

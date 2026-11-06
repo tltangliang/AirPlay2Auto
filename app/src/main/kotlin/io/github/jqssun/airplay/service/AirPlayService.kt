@@ -68,6 +68,7 @@ import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.filter
@@ -301,7 +302,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
                 val prev = intent.getIntExtra(VolumeBroadcast.EXTRA_PREV_VALUE, -1)
                 if (idx < 0 || prev < 0 || idx == prev) return
                 if (_pendingServerVolEchoes > 0) { _pendingServerVolEchoes--; return }
-                if (!_syncClientVol || _connectionCount.value == 0) return
+                if (_fixedVol || !_syncClientVol || _connectionCount.value == 0) return
                 val target = idx.toFloat() / _serverVolMax()
                 Log.d(TAG, "receiver volume $prev -> $idx, sync sender to $target")
                 _serverPreZeroIdx = -1
@@ -334,13 +335,17 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             }
         }
         lifecycleScope.launch {
-            prefs.audioConfigFlow()
+            // music has no picture to stay in sync with, so it gets a larger fixed buffer against Wi-Fi jitter
+            combine(prefs.audioConfigFlow(), _audioOnly, prefs.observe { this[Prefs.MUSIC_BUFFER_MS] }) { cfg, audioOnly, musicMs ->
+                if (audioOnly && musicMs > 0) cfg.copy(cushionMs = musicMs, lowLatency = false) else cfg
+            }
                 .debounce(AUDIO_CONFIG_DEBOUNCE_MS)
                 .collect { audioRenderer.updateConfig(it) }
         }
         lifecycleScope.launch {
-            prefs.observe { this[Prefs.SYNC_CLIENT_VOLUME] }.collect {
-                _syncClientVol = it
+            prefs.observe { this[Prefs.SYNC_CLIENT_VOLUME] to this[Prefs.FIXED_VOLUME] }.collect { (sync, fixed) ->
+                _syncClientVol = sync
+                _fixedVol = fixed
                 _clientVolDriveEnd()
                 _applyClientVol()
             }
@@ -787,6 +792,11 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         val frac = _dbToFrac(db)
         _clientVol = frac
         Log.d(TAG, "sender volume ${db}dB, frac $frac")
+        if (_fixedVol) {
+            // head unit controls loudness: the sender's slider has no effect
+            _mainHandler.post { _setClientGain(1f) }
+            return
+        }
         _mainHandler.post {
             val driving = _clientVolTarget >= 0f
             if (driving) _clientVolStep()
@@ -800,7 +810,13 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         return db
     }
 
-    private fun _clientVolExpected(): Float = if (_syncClientVol) _serverVolFrac() else _clientVol ?: 1f
+    private fun _clientVolExpected(): Float = when {
+        _fixedVol -> 1f
+        _syncClientVol -> _serverVolFrac()
+        else -> _clientVol ?: 1f
+    }
+
+    @Volatile private var _fixedVol = true
 
     fun clientVolume(): Float = _clientVol ?: _clientVolExpected()
 
@@ -814,6 +830,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     private fun _applyClientVol() {
+        if (_fixedVol) { _setClientGain(1f); return }
         val frac = _clientVol
         if (!_syncClientVol) {
             _setClientGain(_clientGain(frac ?: 1f))

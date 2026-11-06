@@ -23,6 +23,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import io.github.jqssun.airplay.service.AirPlayService
+import io.github.jqssun.airplay.ui.CarUiScale
 import io.github.jqssun.airplay.ui.MainScreen
 import io.github.jqssun.airplay.ui.theme.AirPlayTheme
 import io.github.jqssun.airplay.viewmodel.LocalNetworkAccess
@@ -113,6 +114,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             AirPlayTheme {
+              CarUiScale(viewModel) {
                 MainScreen(
                     viewModel = viewModel,
                     isInPip = isInPip.value,
@@ -121,6 +123,7 @@ class MainActivity : ComponentActivity() {
                     onPip = { enterPip() },
                     onLocalNetwork = ::_requestLocalNetwork
                 )
+              }
             }
         }
     }
