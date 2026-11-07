@@ -125,6 +125,11 @@ object Prefs {
     val MUSIC_BUFFER_MS = int("car_music_buffer_ms", 2000, 0..2000)
     // ignore the sender's volume: play at full level and let the head unit control loudness
     val FIXED_VOLUME = bool("car_fixed_volume", true)
+    // hold audio focus while AirPlay plays, so steering-wheel media keys reach this app and other
+    // music apps stop instead of playing over it
+    val CLAIM_MEDIA_KEYS = bool("car_claim_media_keys", true)
+    // when another app takes over the audio for good, pause the phone instead of playing on underneath
+    val PAUSE_ON_FOCUS_LOSS = bool("car_pause_on_focus_loss", true)
     // UI scale in percent, 0 = automatic for wide car screens
     val UI_SCALE = int("car_ui_scale", 0, 0..400)
     // space kept clear of the head unit's status bar / dock in dp, -1 = automatic

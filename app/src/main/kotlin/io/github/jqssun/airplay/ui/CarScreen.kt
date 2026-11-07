@@ -55,6 +55,8 @@ fun CarScreen(viewModel: MainViewModel) {
     val insetBottom by viewModel.pref(Prefs.INSET_BOTTOM_DP).collectAsState()
     val musicBuffer by viewModel.pref(Prefs.MUSIC_BUFFER_MS).collectAsState()
     val fixedVolume by viewModel.pref(Prefs.FIXED_VOLUME).collectAsState()
+    val claimKeys by viewModel.pref(Prefs.CLAIM_MEDIA_KEYS).collectAsState()
+    val pauseOnLoss by viewModel.pref(Prefs.PAUSE_ON_FOCUS_LOSS).collectAsState()
     val advMirroring by viewModel.pref(Prefs.ADVERTISE_MIRRORING).collectAsState()
     val advVideo by viewModel.pref(Prefs.ADVERTISE_VIDEO).collectAsState()
     val autoScale = autoUiScalePercent(androidx.compose.ui.platform.LocalConfiguration.current)
@@ -194,6 +196,16 @@ fun CarScreen(viewModel: MainViewModel) {
         CarSwitch("由车机控制音量", "忽略手机端音量调节，始终以最大音量输出，音量用车机旋钮或方向盘按键调节", fixedVolume) {
             viewModel.set(Prefs.FIXED_VOLUME, it)
         }
+        CarSwitch(
+            "方向盘按键只控制 AirPlay",
+            "播放时占用音频焦点，方向盘的上一首 / 下一首 / 播放暂停只发给本应用，其他音乐应用会暂停而不是被唤起",
+            claimKeys
+        ) { viewModel.set(Prefs.CLAIM_MEDIA_KEYS, it) }
+        if (claimKeys) CarSwitch(
+            "其他应用播放时暂停手机",
+            "在车机上打开其他音乐或收音机并开始播放时，自动暂停 iPhone，按键随之交给该应用",
+            pauseOnLoss
+        ) { viewModel.set(Prefs.PAUSE_ON_FOCUS_LOSS, it) }
         ChipSetting(
             "音乐缓冲（延迟）", "缓冲越大越不容易断流，开始播放会相应延迟；默认 2 秒，与常见 AirPlay 音箱一致。屏幕镜像不受影响，仍用低延迟缓冲保证音画同步",
             musicBuffer, listOf(0 to "自动", 500 to "0.5秒", 1000 to "1秒", 1500 to "1.5秒", 2000 to "2秒")

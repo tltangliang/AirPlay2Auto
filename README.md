@@ -53,6 +53,11 @@ iPhone / iPad / Mac 可以通过「屏幕镜像」或 AirPlay，把画面、视�
 - 音乐默认使用 2 秒缓冲（与常见 AirPlay 音箱相同），足以等到丢失的数据包重传，避免断流；可选 0.5–2 秒。屏幕镜像仍用低延迟自动缓冲，保证音画同步
 - 接收时保持 Wi-Fi 高性能模式，减少省电造成的数据包堆积
 
+**方向盘按键**
+- 播放时占用音频焦点，方向盘的上一首 / 下一首 / 播放暂停只控制 AirPlay，不会唤起车机上的其他音乐应用；其他音乐应用会自动暂停
+- 在车机上打开其他音乐或收音机并开始播放时，自动暂停 iPhone，按键交给该应用
+- 导航播报、语音助手说话时自动压低 AirPlay 音量
+
 **全屏显示**
 - 屏幕镜像：点画面或全屏按钮进入全屏，可选「适应 / 拉伸 / 裁剪」，宽屏车机去黑边，选择会被记住
 - 音乐：播放页横屏时封面占满左侧高度，右侧为歌曲信息和大号播放按钮；另有全屏播放页，横屏 / 竖屏自适应
@@ -130,6 +135,11 @@ Cast screen mirroring, video and music from an iPhone, iPad or Mac to the head u
 - The head unit controls volume by default: the phone's volume changes are ignored and audio plays at full level, adjusted with the head unit's knob or steering-wheel buttons
 - Music uses a 2-second buffer by default (as typical AirPlay speakers do), long enough for lost packets to be resent instead of the audio cutting out; 0.5–2 s selectable. Screen mirroring keeps the low-latency adaptive buffer for lip sync
 - Keeps Wi-Fi in high-performance mode while receiving, so power saving doesn't bunch packets up
+
+**Steering-wheel buttons**
+- Holds audio focus while playing, so the steering wheel's previous / next / play-pause buttons control AirPlay only and no longer wake other music apps on the head unit; other music apps pause
+- When another music app or the radio starts playing on the head unit, the iPhone is paused and the buttons go to that app
+- AirPlay is turned down while navigation prompts or the voice assistant speak
 
 **Full screen**
 - Screen mirroring: tap the picture or the fullscreen button; choose fit / stretch / crop to remove black bars on wide car displays (remembered)

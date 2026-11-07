@@ -37,8 +37,8 @@ android {
         applicationId = "io.github.carairplay"
         minSdk = 23
         targetSdk = 37
-        versionCode = 110
-        versionName = "1.1.0"
+        versionCode = 111
+        versionName = "1.1.1"
 
         externalNativeBuild {
             cmake {

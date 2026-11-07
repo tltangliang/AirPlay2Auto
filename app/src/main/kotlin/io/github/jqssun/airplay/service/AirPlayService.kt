@@ -29,6 +29,11 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import androidx.core.os.ConfigurationCompat
+import androidx.core.content.IntentCompat
+import androidx.media.AudioAttributesCompat
+import androidx.media.AudioFocusRequestCompat
+import androidx.media.AudioManagerCompat
+import android.view.KeyEvent
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import androidx.media.app.NotificationCompat as MediaNotificationCompat
@@ -242,7 +247,35 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             setPlaying = ::_setPlaying,
         )
         mediaSession = MediaSessionCompat(this, "AirPlay").apply {
+            // required for media keys on Android 7 and older head units; ignored on newer releases
+            @Suppress("DEPRECATION")
+            setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS)
             setCallback(object : MediaSessionCompat.Callback() {
+                // the default handler drops keys whose action is missing from the current playback state,
+                // which let early steering-wheel presses fall through to other apps: handle them directly
+                override fun onMediaButtonEvent(mediaButtonEvent: Intent): Boolean {
+                    val ev = IntentCompat.getParcelableExtra(mediaButtonEvent, Intent.EXTRA_KEY_EVENT, KeyEvent::class.java)
+                        ?: return super.onMediaButtonEvent(mediaButtonEvent)
+                    val handled = when (ev.keyCode) {
+                        KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+                        KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_HEADSETHOOK,
+                        KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE -> true
+                        else -> false
+                    }
+                    if (!handled) return super.onMediaButtonEvent(mediaButtonEvent)
+                    if (ev.action != KeyEvent.ACTION_DOWN || ev.repeatCount != 0) return true
+                    Log.i(TAG, "media key ${KeyEvent.keyCodeToString(ev.keyCode)}")
+                    when (ev.keyCode) {
+                        KeyEvent.KEYCODE_MEDIA_NEXT -> onSkipToNext()
+                        KeyEvent.KEYCODE_MEDIA_PREVIOUS -> onSkipToPrevious()
+                        KeyEvent.KEYCODE_MEDIA_PLAY -> onPlay()
+                        KeyEvent.KEYCODE_MEDIA_PAUSE -> onPause()
+                        else -> if (_videoPlaybackActive.value) airPlayVideoPlayer.setPlaying(!_videoPlaybackInfo.value.playing)
+                            else togglePlayPause()
+                    }
+                    return true
+                }
+
                 override fun onPlay() {
                     if (_videoPlaybackActive.value) {
                         airPlayVideoPlayer.setPlaying(true)
@@ -634,6 +667,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     private fun _shutdown() {
+        _abandonAudioFocus()
         audioRenderer.detachEngine()
         if (nativeHandle != 0L) {
             NativeBridge.nativeStop(nativeHandle)
@@ -768,6 +802,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         airPlayVideoPlayer.play(location, startPositionSeconds)
         // claim media-button routing for keys that arrive as media-session events
         mediaSession?.isActive = true
+        _requestAudioFocus()
         log("AirPlay Video play: $location @ ${startPositionSeconds}s")
     }
 
@@ -865,9 +900,72 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     private fun _setClientGain(gain: Float) {
+        _baseGain = gain
+        _pushGain()
+    }
+
+    private fun _pushGain() {
+        val gain = _baseGain * _duckGain
         if (gain == audioRenderer.clientGain) return
         audioRenderer.setClientGain(gain)
         airPlayVideoPlayer.setClientGain(gain)
+    }
+
+    private var _baseGain = 1f
+    private var _duckGain = 1f
+
+    // ---------- audio focus: makes this app the target of steering-wheel media keys ----------
+
+    private var _focusRequest: AudioFocusRequestCompat? = null
+
+    private val _focusListener = AudioManager.OnAudioFocusChangeListener { change ->
+        when (change) {
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                // another app started playing for good: it now owns the media keys
+                synchronized(this) { _focusRequest = null }
+                _duckGain = 1f; _pushGain()
+                log("Audio focus lost to another app")
+                if (prefs[Prefs.PAUSE_ON_FOCUS_LOSS]) {
+                    if (_videoPlaybackActive.value) airPlayVideoPlayer.setPlaying(false)
+                    else if (_playing.value) { _setPlaying(false); dacpController?.pause() }
+                }
+            }
+            // voice assistant, navigation prompt, call: lower AirPlay until it is done
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                _duckGain = DUCK_GAIN; _pushGain()
+            }
+            AudioManager.AUDIOFOCUS_GAIN -> { _duckGain = 1f; _pushGain() }
+        }
+    }
+
+    @Synchronized
+    private fun _requestAudioFocus() {
+        if (_focusRequest != null || !prefs[Prefs.CLAIM_MEDIA_KEYS]) return
+        val req = AudioFocusRequestCompat.Builder(AudioManagerCompat.AUDIOFOCUS_GAIN)
+            .setAudioAttributes(
+                AudioAttributesCompat.Builder()
+                    .setUsage(AudioAttributesCompat.USAGE_MEDIA)
+                    .setContentType(AudioAttributesCompat.CONTENT_TYPE_MUSIC)
+                    .build()
+            )
+            .setWillPauseWhenDucked(false)
+            .setOnAudioFocusChangeListener(_focusListener, _mainHandler)
+            .build()
+        val granted = AudioManagerCompat.requestAudioFocus(audioManager, req) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        if (granted) _focusRequest = req
+        // re-assert media-button routing now that this app is the active player
+        mediaSession?.isActive = true
+        log(if (granted) "Audio focus acquired (media keys -> AirPlay2Auto)" else "Audio focus request denied")
+    }
+
+    @Synchronized
+    private fun _abandonAudioFocus() {
+        val req = _focusRequest ?: return
+        _focusRequest = null
+        AudioManagerCompat.abandonAudioFocusRequest(audioManager, req)
+        _duckGain = 1f
+        _mainHandler.post { _pushGain() }
+        log("Audio focus released")
     }
 
     private fun _serverVolMax() = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
@@ -925,6 +1023,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
             _endVideoPlayback("AirPlay Video stopped (disconnect)")
             // last client gone: release audio output devices to save power
             audioRenderer.stop()
+            _abandonAudioFocus()
             _audioOnly.value = false
             _lastVideoPollAt = 0
             _videoPollSuppressed = false
@@ -1003,6 +1102,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
     }
 
     override fun onMirrorRunning(running: Boolean) {
+        if (running) _requestAudioFocus()
         if (running) videoRenderer.startSession() else {
             videoRenderer.stopSession()
             _mirroringActive.value = false
@@ -1048,6 +1148,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
 
     private fun _setPlaying(playing: Boolean) {
         _playing.value = playing
+        if (playing) _requestAudioFocus()
         _refreshDacpPlayer()
         if (playing) {
             // resume extrapolation from current position
@@ -1306,6 +1407,7 @@ class AirPlayService : LifecycleService(), RaopCallbackHandler, LogListener {
         const val ACTION_PREV = "io.github.jqssun.airplay.PREV"
         const val ACTION_START_SERVER = "io.github.jqssun.airplay.START_SERVER"
         const val EXTRA_DELAY_S = "delay_s"
+        private const val DUCK_GAIN = 0.2f
         private const val MUSIC_OUTPUT_FRAMES = 4096
         const val EXTRA_FROM_BOOT = "from_boot"
         // shared with dpad/double-tap seeks
